@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One segment of the "Next up" widget's progress bar (added in code, one per item). -->
+<ImageView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_seg"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_marginStart="2dp"
+    android:layout_marginEnd="2dp"
+    android:layout_weight="1"
+    android:contentDescription="@null"
+    android:scaleType="fitXY"
+    android:src="@drawable/w_seg" />

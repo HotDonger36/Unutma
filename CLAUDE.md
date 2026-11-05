@@ -1,0 +1,58 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+Unutma is a single-module Android notes/checklist/reminder app (`:app`). The code's package/namespace is `com.example.unutma`, but the installed app id is `app.unutma` (debug builds: `app.unutma.debug`, named "Unutma (debug)" via `resValue`, so they install beside the real app). Don't change `applicationId` again once released. Kotlin + Jetpack Compose (Material 3), Room via KSP, ML Kit on-device text recognition. minSdk 24, target/compile SDK 36, Java 11. Uses AGP 9 with its built-in Kotlin support (no separate `kotlin-android` plugin). Dependency versions live in `gradle/libs.versions.toml`; the KSP version must match the Kotlin version prefix.
+
+The project is not a git repository. `_backup_before_redesign/` holds zip snapshots of earlier versions; don't edit them.
+
+## Commands (Windows, run from the repo root)
+
+```bash
+.\gradlew.bat assembleDebug                 # build debug APK
+.\gradlew.bat installDebug                  # build + install on a connected device/emulator
+.\gradlew.bat testDebugUnitTest             # JVM unit tests (app/src/test)
+.\gradlew.bat testDebugUnitTest --tests "com.example.unutma.ExampleUnitTest"   # single test class
+.\gradlew.bat connectedDebugAndroidTest     # instrumented tests (needs a device)
+.\gradlew.bat lintDebug                     # Android lint
+```
+
+Only template example tests exist today.
+
+## Architecture
+
+**No ViewModels, no DI, no Navigation library.** `MainActivity.kt` holds a hand-rolled back stack (`mutableStateListOf<Route>`) and collects Room `Flow`s directly; screens in `ui/` receive data and callbacks as parameters. `Route.Notes` is the home: `HomeScaffold` (ui/Home.kt) with a bottom bar of three tabs — Notes (`NotesScreen`, with `TodayBlock` + `RoutineHomeCard` as `topContent`), Routines (`RoutinesScreen`) and Calendar (`CalendarScreen`). Widgets and notifications talk to the UI by launching `MainActivity` with custom actions (`ACTION_OPEN_NOTE`, `ACTION_NEW_NOTE`, `ACTION_NEW_LIST`, `ACTION_VOICE`, `ACTION_NEW_PHOTO`, `ACTION_OPEN_CALENDAR`, `ACTION_NEW_EVENT`, `ACTION_OPEN_ROUTINES`), collected from `incoming` in `UnutmaApp` with `snapshotFlow` (not a keyed `LaunchedEffect`, which cancelled itself and dropped note opens).
+
+**`data/Repo.kt` is the single write path.** Every note change must go through `Repo.save` / `saveAll` / `archive` / `delete` / `deleteForever`, because `afterChange` keeps three side systems in sync with the DB: exact alarms (`notify/Alarms`), the ongoing "pinned to notification bar" notification (`notify/Notifier.syncPin`), and all home-screen widgets (`widget/Widgets.refreshAll`). Writing through the DAO directly will leave those stale. `Repo.scope` is an app-lifetime IO scope so saves finish after a screen closes; broadcast receivers use it via `goAsync()` (`notify/Receivers.kt`).
+
+**Note body format (`data/Blocks.kt`).** `Note.description` stores a JSON document `{"v":1,"blocks":[...]}` of `TextBlock` / `CheckBlock` (indent 0–1, optional qty) / `ImageBlock` / `AudioBlock`. Always read with `parseBlocks()` and write with `serializeBlocks()`. `parseBlocks` also reads legacy formats (plain text, or `"1|item"` lines for `LIST` notes), so keep that fallback. Images/audio are files under `filesDir/images` and `filesDir/audio`, referenced by absolute path; removed media is only cleaned up by `Repo.maintenance` after a day, so editor Undo can restore it. Text supports light markdown (`#` headings, `**bold**`, `*italic*`, `[[Note title]]` links between notes); see `ui/Markdown.kt` and `stripMarkdown`. The editor hides the `*` and `# ` markers (`NoteTransformation` + `hiddenMarkers`, with an `OffsetMapping`); `fixMarkerEdit` keeps a backspace from deleting a hidden marker, `toggleEmphasis` drives B/I (an empty styled spot is `**​**`, stripped by `cleanForSave`). `ImageBlock.width` (0.3–1, JSON `"w"`) is the picture's share of the width.
+
+**Delete = soft delete.** Deleting sets `isArchived = true` + `deletedAt` (shown in "Recently deleted"); plain archiving leaves `deletedAt` null (shown in "Archive") and is never purged. Both screens are `ArchiveScreen(deletedView = …)`; `archiveDays == ARCHIVE_FOREVER` (0) never purges. `Repo.maintenance` (on app start, on boot, and via a daily ~00:02 alarm) purges deleted notes older than `Settings.archiveDays`, archives notes past `expiresAt`, resets daily/weekly checklists (`resetMode`, weeks start Monday), and cleans orphan media.
+
+**Reminders.** `Alarms.syncNote` schedules exact alarms per note, with request codes `1_000_000 + noteId*10 + slot` (slot 1 = remind, 2 = expire, 9 = maintenance). `nagMinutes > 0` means the reminder re-arms itself until "Done". `BootReceiver.restoreAll` re-creates alarms/pins after boot, app update and time/zone changes, and fires missed reminders.
+
+**Editor (`ui/EditorState.kt`, `ui/EditorScreen.kt`, `ui/EditorParts.kt`).** `EditorState` holds the editable rows (`EItem` = block + `TextFieldValue`) and undo/redo snapshots. Each edit bumps `version`; the screen autosaves after a short debounce and skips the save if `version == savedVersion`. The bottom bar has four tabs (Text / Insert open a tool row; Remind; Details opens a sheet with label, dates, repeat, pins, lock); ⋯ only has Share, Archive, Delete. Rows are reordered with `reorderDrag` (checkbox handle, or hold a picture).
+
+**Routines (`data/Routines.kt`, `ui/RoutineUi.kt`).** A routine is a checklist with a schedule in `Note.resetMode` (no DB change): `DAILY`, `WEEKLY`, `DAYS:1,3,5` (1 = Monday), `EVERY:n:fromDay`. `Routines.record` (called from `Repo.afterChange`) stores each day's % ticked in Prefs `progress_<id>` (JSON, local epoch days); streak/best/week squares are computed from that. `Repo.periodStart` delegates to `Routines.periodStart`.
+
+**Calendar (`data/Cal.kt`, `ui/CalendarUi.kt`, `widget/CalendarWidgets.kt`).** Google Calendar through `CalendarContract` (READ/WRITE_CALENDAR, asked for on the Calendar tab). Instances for reading, Events/Reminders for writing; all-day events are UTC midnights. Notes linked to events are kept in Prefs `event_note_<eventId>`.
+
+**Locked notes are encrypted (`data/Vault.kt`).** Per-note AES-GCM key wrapped with a Keystore RSA key (public half used outside the keystore, so locking needs no auth; unwrapping needs a strong-biometric/credential unlock within 30 s, which `MainActivity.unlock` provides). Sealed body is `{"enc":1,…,"m":[media paths]}`; `parseBlocks` returns only the media blocks for it. The editor decrypts on open, keeps `EditorState.vaultKey`, and re-seals in `persist()`. `Repo.sealLockedNotes` (in `maintenance`) encrypts any locked-but-plain notes. Titles and media files stay unencrypted. Removing the phone's screen lock deletes the key.
+
+**Database (`NoteDatabase.kt`).** Room, version 4, `exportSchema = false`, tables `notes` and `labels`. Schema changes need a new version and an explicit `Migration` (see `MIGRATION_3_4`); destructive fallback is only allowed from versions 1–2. The `Note` entity is still in the root package next to `NoteDao.kt`.
+
+**Settings (`data/Prefs.kt`).** SharedPreferences (`unutma_prefs`) exposed as a `StateFlow<Settings>`, readable from receivers and widgets too. It also stores widget→note mappings (`widget_<id>`), per-widget text size/label, collapsed note sections, your own note order per section (`note_order_<section>`, used by `SortOrder.CUSTOM`), routine progress, event↔note links and one-off flags (e.g. `guide_seeded`). Old enum/accent values are mapped on load, so keep those mappings when renaming.
+
+**Widgets (`widget/Widgets.kt`, `widget/ChecklistWidgets.kt`).** RemoteViews-based (not Glance): QuickCapture, Countdown, ListSmall, List (with `ListWidgetService`), Note, plus the 2×2 checklist widgets DailyList, RingList, NextUp and Streak, and `NotesListWidget` (many notes, `NotesListService`; not a `NoteWidgetBase`, refreshed separately in `refreshAll`). `WidgetConfigActivity` is the per-widget settings screen (note or label choice + per-widget text size in Prefs `widget_size_<id>`). Widget open intents carry a unique data URI so PendingIntents never merge. All note widgets extend `NoteWidgetBase` and are listed in `Widgets.noteProviders`; a new widget needs to be added there, in the manifest, and get an `xml/widget_*_info.xml` and name/description strings. Ticking from a widget sends `Widgets.ACTION_TOGGLE` to the provider, handled in `NoteWidgetBase.onReceive` → `Repo.toggleCheck` (the index counts only checkboxes with text). Checkboxes, rings and day squares are drawn as bitmaps because RemoteViews can't draw shapes; text sizes go through `Widgets.scaleText` for the "Widget text size" setting. Streak days are local epoch days stored in Prefs (`done_days_<noteId>`), updated by `Repo.recordDoneDay` on every save.
+
+**Pinned notification (`notify/Notifier.syncPin`).** Custom RemoteViews (`notif_pin_small`/`notif_pin_big`) with tappable checkbox rows → `PinReceiver.ACTION_TOGGLE`. The "Show pinned notes opened" setting switches between the `pinned_notes` (low) and `pinned_notes_top` (default importance, silent) channels; `Notifier.resyncPins` re-posts after it changes.
+
+**Other pieces.** `data/Guide.kt` seeds tutorial notes on first launch (`Guide.build` is also the Help page's text, via `Guide.topics`); update it when a user-facing feature changes. Seeding is guarded by a Mutex and skips titles that already exist. `Repo.createFromSpeech` turns voice input into checklists ("shopping list eggs, milk and bread") or reminders ("remind me to … tomorrow at 10") using `util/DateDetector` (in `Dates.kt`). Locked notes use `BiometricPrompt` (API 30+) or the keyguard confirm screen. Colours/accents are keys into the palette in `ui/theme/Color.kt` (`swatch(key)`), and widgets use the same palette.
+
+## Conventions
+
+- Code comments and UI strings are written in plain, user-facing English (many UI strings are inline in Kotlin rather than `strings.xml`).
+- Timestamps are epoch milliseconds; `null` means "not set".
+- Use `touch = false` on `Repo.save` for system-driven changes (reminder fired, snooze, unpin) so `updatedAt` and "Newest first" ordering aren't affected.

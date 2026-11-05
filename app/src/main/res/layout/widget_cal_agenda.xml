@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Calendar agenda: today's date on the left with a + for a new event, the next events on the right. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_ca_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="horizontal"
+    android:padding="18dp">
+
+    <LinearLayout
+        android:layout_width="76dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/w_ca_dow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/geist_semibold"
+            android:letterSpacing="0.1"
+            android:textColor="#A98BFF"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/w_ca_day"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/geist_mono_light"
+            android:includeFontPadding="false"
+            android:textColor="#EDEDED"
+            android:textSize="44sp" />
+
+        <TextView
+            android:id="@+id/w_ca_month"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/geist_mono_regular"
+            android:textColor="#8A8A8A"
+            android:textSize="12sp" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <ImageView
+            android:id="@+id/w_ca_new"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/widget_circle"
+            android:contentDescription="New event"
+            android:scaleType="center"
+            android:src="@drawable/ic_w_plus" />
+    </LinearLayout>
+
+    <ImageView
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="14dp"
+        android:background="#1E1E1E"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/w_ca_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="@font/geist_mono_regular"
+            android:gravity="center"
+            android:textColor="#8A8A8A"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/w_ca_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/w_ca_head0"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="2dp"
+                android:fontFamily="@font/geist_semibold"
+                android:letterSpacing="0.1"
+                android:textColor="#6E6E6E"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/w_ca_row0"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="38dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/w_ca_time0"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/geist_mono_regular"
+                    android:maxLines="1"
+                    android:textColor="#8A8A8A"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:id="@+id/w_ca_dot0"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/w_ca_title0"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/geist_regular"
+                    android:maxLines="1"
+                    android:textColor="#EDEDED"
+                    android:textSize="15sp" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/w_ca_head1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="2dp"
+                android:fontFamily="@font/geist_semibold"
+                android:letterSpacing="0.1"
+                android:textColor="#6E6E6E"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/w_ca_row1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="38dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/w_ca_time1"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/geist_mono_regular"
+                    android:maxLines="1"
+                    android:textColor="#8A8A8A"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:id="@+id/w_ca_dot1"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/w_ca_title1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/geist_regular"
+                    android:maxLines="1"
+                    android:textColor="#EDEDED"
+                    android:textSize="15sp" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/w_ca_head2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="2dp"
+                android:fontFamily="@font/geist_semibold"
+                android:letterSpacing="0.1"
+                android:textColor="#6E6E6E"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/w_ca_row2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="38dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/w_ca_time2"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/geist_mono_regular"
+                    android:maxLines="1"
+                    android:textColor="#8A8A8A"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:id="@+id/w_ca_dot2"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/w_ca_title2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/geist_regular"
+                    android:maxLines="1"
+                    android:textColor="#EDEDED"
+                    android:textSize="15sp" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/w_ca_head3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="2dp"
+                android:fontFamily="@font/geist_semibold"
+                android:letterSpacing="0.1"
+                android:textColor="#6E6E6E"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/w_ca_row3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="38dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/w_ca_time3"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/geist_mono_regular"
+                    android:maxLines="1"
+                    android:textColor="#8A8A8A"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:id="@+id/w_ca_dot3"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/w_ca_title3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/geist_regular"
+                    android:maxLines="1"
+                    android:textColor="#EDEDED"
+                    android:textSize="15sp" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/w_ca_head4"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="2dp"
+                android:fontFamily="@font/geist_semibold"
+                android:letterSpacing="0.1"
+                android:textColor="#6E6E6E"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/w_ca_row4"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="38dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/w_ca_time4"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/geist_mono_regular"
+                    android:maxLines="1"
+                    android:textColor="#8A8A8A"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:id="@+id/w_ca_dot4"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/w_ca_title4"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/geist_regular"
+                    android:maxLines="1"
+                    android:textColor="#EDEDED"
+                    android:textSize="15sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

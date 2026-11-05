@@ -1,0 +1,28 @@
+<resources>
+    <string name="widget_quick_name">Unutma · Quick capture</string>
+    <string name="widget_countdown_name">Unutma · Countdown</string>
+    <string name="widget_list_small_name">Unutma · Small list</string>
+    <string name="widget_list_name">Unutma · Checklist</string>
+    <string name="widget_note_name">Unutma · Note</string>
+    <string name="widget_quick_desc">Quick capture: new note, checklist or talk to create</string>
+    <string name="widget_countdown_desc">Days left until a note\'s date</string>
+    <string name="widget_list_small_desc">A checklist\'s progress and next item</string>
+    <string name="widget_list_desc">A checklist you can tick from the home screen</string>
+    <string name="widget_note_desc">Shows a note</string>
+    <string name="widget_daily_name">Unutma · Daily checklist</string>
+    <string name="widget_ring_name">Unutma · Progress ring</string>
+    <string name="widget_nextup_name">Unutma · Next up</string>
+    <string name="widget_streak_name">Unutma · Streak</string>
+    <string name="widget_daily_desc">Three items you can tick, and when the list resets</string>
+    <string name="widget_ring_desc">A big progress ring and the next item to tick</string>
+    <string name="widget_nextup_desc">Tap the card to tick off the next item</string>
+    <string name="widget_streak_desc">Days in a row with everything ticked</string>
+    <string name="widget_cal_agenda_name">Unutma · Agenda</string>
+    <string name="widget_cal_next_name">Unutma · Next event</string>
+    <string name="widget_cal_week_name">Unutma · This week</string>
+    <string name="widget_cal_agenda_desc">Your next calendar events, with a button for a new one</string>
+    <string name="widget_cal_next_desc">How long until your next calendar event</string>
+    <string name="widget_cal_week_desc">How busy each day of this week is</string>
+    <string name="widget_notes_name">Unutma · Notes</string>
+    <string name="widget_notes_desc">Several notes at once, with quick buttons for new notes</string>
+</resources>

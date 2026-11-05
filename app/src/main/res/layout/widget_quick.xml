@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="22dp"
+    android:paddingEnd="12dp">
+
+    <TextView
+        android:id="@+id/w_quick_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:fontFamily="@font/geist_mono_light"
+        android:letterSpacing="0.5"
+        android:maxLines="1"
+        android:text="UNUTMA"
+        android:textColor="#E2E2E2"
+        android:textSize="15sp" />
+
+    <ImageView
+        android:id="@+id/w_quick_note"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/widget_circle"
+        android:contentDescription="New note"
+        android:scaleType="center"
+        android:src="@drawable/ic_w_plus" />
+
+    <ImageView
+        android:id="@+id/w_quick_list"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="4dp"
+        android:background="@drawable/widget_circle"
+        android:contentDescription="New checklist"
+        android:scaleType="center"
+        android:src="@drawable/ic_w_checklist" />
+
+    <ImageView
+        android:id="@+id/w_quick_mic"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="4dp"
+        android:contentDescription="Talk to create a note"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_w_mic_ring" />
+</LinearLayout>

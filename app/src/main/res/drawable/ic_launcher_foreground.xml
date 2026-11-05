@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Unutma icon: the straightened purple valknut ("Chosen icon · Purple" in the Final Design), three
+    interlocked triangles on #0E0E12. Drawn on its 432 × 432 canvas, scaled to sit inside the adaptive-icon
+    safe zone. The dark outlines separate the triangles where they cross; the last group, clipped to the
+    left triangle, lays the bottom triangle back over it so the three interlock.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="14.04"
+        android:translateY="14.04"
+        android:scaleX="0.185"
+        android:scaleY="0.185">
+        <!-- Bottom triangle -->
+        <path
+            android:fillColor="#A98BFF"
+            android:fillType="evenOdd"
+            android:strokeColor="#0E0E12"
+            android:strokeWidth="8"
+            android:strokeLineJoin="miter"
+            android:pathData="M216,159.6L101,358.8H331Z M216,239.5L261.8,318.8H170.2Z" />
+        <!-- Right triangle -->
+        <path
+            android:fillColor="#A98BFF"
+            android:fillType="evenOdd"
+            android:strokeColor="#0E0E12"
+            android:strokeWidth="8"
+            android:strokeLineJoin="miter"
+            android:pathData="M266,73L151,272.2H381Z M266,152.9L311.8,232.2H220.2Z" />
+        <!-- Left triangle -->
+        <path
+            android:fillColor="#A98BFF"
+            android:fillType="evenOdd"
+            android:strokeColor="#0E0E12"
+            android:strokeWidth="8"
+            android:strokeLineJoin="miter"
+            android:pathData="M166,73L51,272.2H281Z M166,152.9L211.8,232.2H120.2Z" />
+        <!-- The bottom triangle again, only inside the left one, so it passes over it -->
+        <group>
+            <clip-path android:pathData="M166,73L51,272.2H281Z M166,152.9L211.8,232.2H120.2Z" />
+            <path
+                android:fillColor="#A98BFF"
+                android:fillType="evenOdd"
+                android:strokeColor="#0E0E12"
+                android:strokeWidth="8"
+                android:strokeLineJoin="miter"
+                android:pathData="M216,159.6L101,358.8H331Z M216,239.5L261.8,318.8H170.2Z" />
+        </group>
+    </group>
+</vector>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="exports" path="exports/" />
+    <!-- Photos taken from the Notes widget's camera button, before they're copied into the note. -->
+    <cache-path name="camera" path="camera/" />
+</paths>

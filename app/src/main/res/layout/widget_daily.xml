@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Daily checklist: title and progress, three items you can tick, and when it resets. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_a_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/w_a_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="@font/geist_medium"
+            android:maxLines="1"
+            android:textColor="#EDEDED"
+            android:textSize="16sp" />
+
+        <ImageView
+            android:id="@+id/w_a_ring"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/w_a_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="@font/geist_mono_regular"
+            android:textColor="#8A8A8A"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/w_a_rule"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp"
+        android:background="#A98BFF"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:id="@+id/w_a_row0"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="32dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/w_a_box0"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/w_a_text0"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="@font/geist_regular"
+            android:maxLines="1"
+            android:textColor="#EDEDED"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_a_row1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="32dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/w_a_box1"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/w_a_text1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="@font/geist_regular"
+            android:maxLines="1"
+            android:textColor="#EDEDED"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_a_row2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="32dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/w_a_box2"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/w_a_text2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="@font/geist_regular"
+            android:maxLines="1"
+            android:textColor="#EDEDED"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/w_a_locked"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fontFamily="@font/geist_mono_regular"
+        android:gravity="center"
+        android:text="Locked note"
+        android:textColor="#8A8A8A"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/w_a_space"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/w_a_footer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="@font/geist_mono_regular"
+        android:letterSpacing="0.1"
+        android:maxLines="1"
+        android:textColor="#6B6B6B"
+        android:textSize="10sp" />
+</LinearLayout>

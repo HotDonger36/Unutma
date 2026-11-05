@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification icon for pinned notes: the Unutma logo (same shape as ic_launcher_monochrome, cropped to fill the icon). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="340"
+    android:viewportHeight="340">
+    <group
+        android:translateX="-46"
+        android:translateY="-48">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M239.06,191.55L266.00,144.90L318.73,236.20L264.84,236.20L283.31,268.20L374.07,268.20L266.00,81.00L220.62,159.61ZM190.18,276.20L153.30,276.20L107.93,354.80L324.07,354.80L278.70,276.20L241.82,276.20L268.73,322.80L163.27,322.80ZM197.56,199.54L195.25,203.54L211.80,232.20L178.71,232.20L176.40,236.20L167.16,252.20L157.92,268.20L155.61,272.20L192.49,272.20L194.81,268.20L206.44,248.05L213.29,236.20L216.00,231.50L218.71,236.20L225.56,248.05L237.19,268.20L239.51,272.20L276.39,272.20L216.00,167.60L216.00,167.60ZM216.00,247.50L204.04,268.20L227.96,268.20ZM57.93,268.20L148.69,268.20L167.16,236.20L113.27,236.20L166.00,144.90L192.94,191.55L211.38,159.60L166.00,81.00ZM181.02,228.20L204.87,228.20L192.94,207.55Z" />
+    </group>
+</vector>

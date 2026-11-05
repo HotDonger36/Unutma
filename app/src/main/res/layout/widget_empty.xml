@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_empty_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fontFamily="@font/geist_mono_regular"
+        android:gravity="center"
+        android:padding="16dp"
+        android:text="Tap to choose a note"
+        android:textColor="#8A8A8A"
+        android:textSize="12sp" />
+</FrameLayout>

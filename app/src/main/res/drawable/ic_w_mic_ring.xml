@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 48dp ring + microphone in one drawable, tinted with the accent colour at runtime. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1" android:fillColor="#00000000"
+        android:pathData="M24,0.5a23.5,23.5 0 1,0 0.01,0z" />
+    <group android:translateX="12" android:translateY="12">
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:fillColor="#00000000"
+            android:pathData="M12,3a3,3 0 0 1 3,3v5a3,3 0 0 1 -6,0v-5a3,3 0 0 1 3,-3z" />
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.5" android:strokeLineCap="round" android:fillColor="#00000000"
+            android:pathData="M5,11a7,7 0 0 0 14,0M12,18v3" />
+    </group>
+</vector>

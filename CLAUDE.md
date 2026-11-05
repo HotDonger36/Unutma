@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Unutma is a single-module Android notes/checklist/reminder app (`:app`). The code's package/namespace is `com.example.unutma`, but the installed app id is `app.unutma` (debug builds: `app.unutma.debug`, named "Unutma (debug)" via `resValue`, so they install beside the real app). Don't change `applicationId` again once released. Kotlin + Jetpack Compose (Material 3), Room via KSP, ML Kit on-device text recognition. minSdk 24, target/compile SDK 36, Java 11. Uses AGP 9 with its built-in Kotlin support (no separate `kotlin-android` plugin). Dependency versions live in `gradle/libs.versions.toml`; the KSP version must match the Kotlin version prefix.
 
-The project is not a git repository. `_backup_before_redesign/` holds zip snapshots of earlier versions; don't edit them.
+The project is a git repository on GitHub (`HotDonger36/Unutma`, branch `main`); earlier versions live in the git history.
 
 ## Commands (Windows, run from the repo root)
 

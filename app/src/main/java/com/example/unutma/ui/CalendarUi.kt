@@ -13,6 +13,8 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -158,9 +160,14 @@ private fun EventRow(e: CalEvent, compact: Boolean, onOpenNote: (Int) -> Unit) {
 
 // ─── Calendar tab ────────────────────────────────────────────────────────────
 
+/** Weeks you can swipe through: about 10 years back and forward from today. */
+private const val WEEK_PAGES = 1041
+private const val WEEK_MID = WEEK_PAGES / 2
+
 /**
- * Seven days to pick from, then the agenda from the picked day. Swipe an event to the left to
- * delete it; + adds one.
+ * Seven days to pick from (swipe the strip for earlier or later weeks, tap the month to jump to a
+ * date), then the agenda from the picked day. Swipe an event to the left to delete it; + adds one
+ * on the picked day.
  */
 @Composable
 fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: Boolean = false, onNewEventShown: () -> Unit = {}) {
@@ -178,11 +185,49 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
     var deleting by remember { mutableStateOf<CalEvent?>(null) }
     LaunchedEffect(openNewEvent, granted) { if (openNewEvent && granted) { creating = true; onNewEventShown() } }
 
+    // The week strip is a pager you swipe left/right: page MID is the seven days from today,
+    // each page before or after it is seven days earlier or later.
+    val pager = rememberPagerState(initialPage = WEEK_MID) { WEEK_PAGES }
+    fun weekStart(page: Int): Long = today + (page - WEEK_MID) * 7L
+    fun pageOf(day: Long): Int = (WEEK_MID + Math.floorDiv(day - today, 7L).toInt()).coerceIn(0, WEEK_PAGES - 1)
+    // After a swipe, keep the picked day if it's in the new week; otherwise pick the week's first day (today on the start page).
+    LaunchedEffect(pager.settledPage) {
+        val start = weekStart(pager.settledPage)
+        if (picked !in start until start + 7) picked = start
+    }
+    fun jumpTo(day: Long) {
+        picked = day
+        scope.launch { pager.animateScrollToPage(pageOf(day)) }
+    }
+
     Box(Modifier.fillMaxSize().background(C.bg)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 30.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Calendar", style = Ty.screenTitle, color = C.fg, modifier = Modifier.weight(1f))
-                Text(SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(Routines.startOf(picked))).uppercase(), style = Ty.mono, color = C.muted)
+                if (granted && (picked != today || pager.currentPage != WEEK_MID)) {
+                    Text(
+                        "TODAY", style = Ty.mono, color = C.accent,
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(role = Role.Button, onClickLabel = "Go back to today") { jumpTo(today) }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                // Tap the month to jump to any date.
+                Text(
+                    SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(Routines.startOf(picked))).uppercase(),
+                    style = Ty.mono, color = C.muted,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(enabled = granted, onClickLabel = "Pick a date") {
+                        val cal = java.util.Calendar.getInstance().apply { timeInMillis = Routines.startOf(picked) }
+                        android.app.DatePickerDialog(
+                            ctx, android.R.style.Theme_DeviceDefault_Dialog_Alert,
+                            { _, y, m, d ->
+                                val ms = java.util.Calendar.getInstance().apply { clear(); set(y, m, d, 12, 0) }.timeInMillis
+                                jumpTo(Routines.dayOf(ms))
+                            },
+                            cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH),
+                        ).show()
+                    }.padding(horizontal = 4.dp, vertical = 4.dp),
+                )
             }
             if (!granted) {
                 Column(Modifier.fillMaxSize().padding(40.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -195,22 +240,25 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
                 }
                 return@Box
             }
-            // Seven days, starting today.
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                val dots = rememberEvents(today, 7, version).groupBy { Routines.dayOf(it.begin) }
-                for (i in 0..6) {
-                    val d = today + i
-                    val on = d == picked
-                    Column(
-                        Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(14.dp)).background(if (on) C.accent else Color.Transparent)
-                            .clickable(role = Role.Tab) { picked = d }.semantics { contentDescription = dayName(d, today) },
-                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(Routines.DAY_NAMES[Routines.weekday(d) - 1].uppercase(), style = Ty.mono, color = if (on) C.bg else C.muted)
-                        Text(SimpleDateFormat("d", Locale.getDefault()).format(Date(Routines.startOf(d))), style = Ty.monoValue, color = if (on) C.bg else C.fg)
-                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.height(6.dp).padding(top = 2.dp)) {
-                            dots[d].orEmpty().map { it.color }.distinct().take(3).forEach { col ->
-                                Box(Modifier.size(4.dp).clip(CircleShape).background(if (on) C.bg else Color(col or 0xFF000000.toInt())))
+            // Seven days per page; swipe for earlier or later weeks.
+            HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth(), beyondViewportPageCount = 1) { page ->
+                val start = weekStart(page)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val dots = rememberEvents(start, 7, version).groupBy { Routines.dayOf(it.begin) }
+                    for (i in 0..6) {
+                        val d = start + i
+                        val on = d == picked
+                        Column(
+                            Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(14.dp)).background(if (on) C.accent else Color.Transparent)
+                                .clickable(role = Role.Tab) { picked = d }.semantics { contentDescription = dayName(d, today) },
+                            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(Routines.DAY_NAMES[Routines.weekday(d) - 1].uppercase(), style = Ty.mono, color = if (on) C.bg else C.muted)
+                            Text(SimpleDateFormat("d", Locale.getDefault()).format(Date(Routines.startOf(d))), style = Ty.monoValue, color = if (on) C.bg else C.fg)
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.height(6.dp).padding(top = 2.dp)) {
+                                dots[d].orEmpty().map { it.color }.distinct().take(3).forEach { col ->
+                                    Box(Modifier.size(4.dp).clip(CircleShape).background(if (on) C.bg else Color(col or 0xFF000000.toInt())))
+                                }
                             }
                         }
                     }
@@ -220,7 +268,10 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
             val byDay = events.groupBy { Routines.dayOf(it.begin).coerceAtLeast(picked) }
             if (events.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(40.dp), contentAlignment = Alignment.Center) {
-                    Text("Nothing in the next two weeks.", style = Ty.rowSub, color = C.muted)
+                    Text(
+                        if (picked == today) "Nothing in the next two weeks." else "Nothing in the two weeks from ${dayName(picked, today)}.",
+                        style = Ty.rowSub, color = C.muted, textAlign = TextAlign.Center,
+                    )
                 }
             } else LazyColumn(contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 120.dp)) {
                 byDay.toSortedMap().forEach { (day, list) ->

@@ -67,7 +67,7 @@ object Guide {
                     • Notes save themselves as you type. There's no Save button.
                     • Made a mistake? Use undo and redo at the top of a note.
                     • Tap a note to open it. Long-press a note to select several.
-                    • The bar at the bottom switches between Notes, Routines (checklists that come back, with streaks) and Calendar (your Google Calendar).
+                    • The bar at the bottom switches between Notes, Routines (checklists that come back, with streaks) and Calendar (your Google Calendar). In Calendar, swipe the days left or right for other weeks, or tap the month to jump to a date.
 
                     The other guide notes go into the details. Start with [[Checklists]].
                 """),

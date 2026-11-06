@@ -25,6 +25,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing key. GitHub builds the APK with the key saved in the repo's Secrets
+    // (see .github/workflows/release.yml). On your PC these aren't set, so Android Studio's
+    // "Generate Signed APK" keeps working as before.
+    val keystoreFile = System.getenv("UNUTMA_KEYSTORE_FILE")
+    signingConfigs {
+        if (keystoreFile != null) {
+            create("release") {
+                storeFile = file(keystoreFile)
+                storePassword = System.getenv("UNUTMA_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("UNUTMA_KEY_ALIAS")
+                keyPassword = System.getenv("UNUTMA_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         // Test builds install as a separate app ("Unutma (debug)"), so they never touch your real notes.
         debug {
@@ -32,6 +47,7 @@ android {
             resValue("string", "app_name", "Unutma (debug)")
         }
         release {
+            if (keystoreFile != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

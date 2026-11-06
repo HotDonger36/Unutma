@@ -2,7 +2,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_cal_week_desc"
     android:initialLayout="@layout/widget_cal_week"
-    android:previewLayout="@layout/widget_cal_week"
+    android:previewLayout="@layout/widget_preview_cal_week"
     android:minWidth="110dp"
     android:minHeight="110dp"
     android:minResizeWidth="110dp"

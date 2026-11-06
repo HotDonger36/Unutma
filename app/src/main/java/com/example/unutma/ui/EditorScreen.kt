@@ -47,6 +47,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.semantics.Role
@@ -325,9 +329,80 @@ private fun Editor(
     var dragId by remember { mutableStateOf<Long?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     val heights = remember { HashMap<Long, Int>() }
+    val tops = remember { HashMap<Long, Float>() }          // each row's top, within the note
+    val textLayouts = remember { HashMap<Long, androidx.compose.ui.text.TextLayoutResult>() }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var contentWidth by remember { mutableIntStateOf(1) }
+
+    // ─── Moving a picture ("top and bottom" wrapping) ───
+    // Hold a picture and drag it: a line shows where it will land — between rows, or splitting a
+    // paragraph at a line — and it never sits beside text. Dragging it sideways sets Left / Centre / Right.
+    var imgDragId by remember { mutableStateOf<Long?>(null) }
+    var imgDx by remember { mutableFloatStateOf(0f) }
+    var imgDy by remember { mutableFloatStateOf(0f) }
+    var drop by remember { mutableStateOf<ImageDrop?>(null) }
+
+    fun findDrop(id: Long): ImageDrop? {
+        val y = (tops[id] ?: return null) + (heights[id] ?: 0) / 2f + imgDy
+        val others = s.items.filter { it.id != id }
+        if (others.isEmpty()) return null
+        for (it in others) {
+            val t = tops[it.id] ?: continue
+            val h = (heights[it.id] ?: 0).toFloat()
+            if (y < t) return ImageDrop(it.id, before = true, splitAt = null, lineY = t)
+            if (y >= t + h) continue
+            val layout = textLayouts[it.id]
+            if (it.block is TextBlock && layout != null && it.tfv.text.isNotEmpty()) {
+                // Inside a paragraph: split it at the nearest line boundary.
+                val local = y - t
+                val line = layout.getLineForVerticalPosition(local)
+                val upper = local < (layout.getLineTop(line) + layout.getLineBottom(line)) / 2
+                val shown = if (upper) layout.getLineStart(line) else layout.getLineEnd(line)
+                val lineY = t + if (upper) layout.getLineTop(line) else layout.getLineBottom(line)
+                val text = it.tfv.text
+                val orig = transformation.filter(androidx.compose.ui.text.AnnotatedString(text)).offsetMapping
+                    .transformedToOriginal(shown.coerceIn(0, layout.layoutInput.text.length)).coerceIn(0, text.length)
+                return when {
+                    orig <= 0 -> ImageDrop(it.id, before = true, splitAt = null, lineY = t)
+                    orig >= text.length -> ImageDrop(it.id, before = false, splitAt = null, lineY = lineY)
+                    else -> ImageDrop(it.id, before = false, splitAt = orig, lineY = lineY)
+                }
+            }
+            val before = y < t + h / 2
+            return ImageDrop(it.id, before, null, if (before) t else t + h)
+        }
+        val last = others.last()
+        return ImageDrop(last.id, before = false, splitAt = null, lineY = (tops[last.id] ?: 0f) + (heights[last.id] ?: 0))
+    }
+
+    fun imageDrag(b: ImageBlock): Modifier = Modifier.pointerInput(b.id) {
+        detectDragGesturesAfterLongPress(
+            onDragStart = {
+                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                imgDragId = b.id; imgDx = 0f; imgDy = 0f; drop = null
+            },
+            onDragEnd = {
+                val cur = s.items.firstOrNull { it.id == b.id }?.block as? ImageBlock ?: b
+                // Sideways: where its middle ends up picks Left / Centre / Right (resized pictures only).
+                if (cur.width < 1f && kotlin.math.abs(imgDx) > 24.dp.toPx()) {
+                    val w = contentWidth * cur.width
+                    val left = when (cur.align) { ImageBlock.CENTER -> (contentWidth - w) / 2; ImageBlock.RIGHT -> contentWidth - w; else -> 0f }
+                    val mid = left + imgDx + w / 2
+                    s.setImageAlign(b.id, when { mid < contentWidth / 3f -> ImageBlock.LEFT; mid > contentWidth * 2 / 3f -> ImageBlock.RIGHT; else -> ImageBlock.CENTER })
+                }
+                drop?.let { d -> if (kotlin.math.abs(imgDy) > 12.dp.toPx()) s.placeImage(b.id, d.anchorId, d.before, d.splitAt) }
+                imgDragId = null; imgDx = 0f; imgDy = 0f; drop = null
+            },
+            onDragCancel = { imgDragId = null; imgDx = 0f; imgDy = 0f; drop = null },
+        ) { change, amount ->
+            change.consume()
+            imgDx += amount.x; imgDy += amount.y
+            drop = if (kotlin.math.abs(imgDy) > 12.dp.toPx()) findDrop(b.id) else null
+        }
+    }
 
     /**
-     * Moves a row up or down as it's dragged: checkboxes by their handle, pictures after holding them.
+     * Moves a checklist row up or down as it's dragged by its handle (pictures use imageDrag).
      * It swaps with the neighbour once dragged past half of the neighbour's height.
      */
     fun reorderDrag(id: Long, afterLongPress: Boolean): Modifier = Modifier.pointerInput(id, afterLongPress) {
@@ -375,7 +450,14 @@ private fun Editor(
 
         // ─── Content ───
         Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)
+                .onSizeChanged { contentWidth = it.width.coerceAtLeast(1) }
+                // Where a dragged picture will land.
+                .drawWithContent {
+                    drawContent()
+                    val d = drop
+                    if (imgDragId != null && d != null) drawLine(tint, Offset(0f, d.lineY), Offset(size.width, d.lineY), strokeWidth = 2.dp.toPx())
+                },
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             Spacer(Modifier.height(4.dp))
@@ -412,24 +494,31 @@ private fun Editor(
             s.items.forEachIndexed { index, item ->
                 key(item.id) {
                     val dragging = dragId == item.id
+                    val movingImage = imgDragId == item.id
                     Box(
                         Modifier
                             .fillMaxWidth()
                             .onSizeChanged { heights[item.id] = it.height }
-                            .zIndex(if (dragging) 1f else 0f)
-                            .graphicsLayer { translationY = if (dragging) dragOffset else 0f; alpha = if (dragging) 0.85f else 1f }
+                            .onGloballyPositioned { tops[item.id] = it.positionInParent().y }
+                            .zIndex(if (dragging || movingImage) 1f else 0f)
+                            .graphicsLayer {
+                                translationY = if (dragging) dragOffset else if (movingImage) imgDy else 0f
+                                translationX = if (movingImage) imgDx else 0f
+                                alpha = if (dragging || movingImage) 0.85f else 1f
+                            }
                             .padding(bottom = if (index < s.items.lastIndex) 12.dp else 0.dp)
                     ) {
                         when (val b = item.block) {
                             is TextBlock -> TextRow(
                                 s, item, focusRequesters, transformation,
                                 placeholder = if (s.items.size == 1) "Note" else null,
+                                onLayout = { textLayouts[item.id] = it },
                             )
                             is CheckBlock -> CheckRow(
                                 s, item, b, tint, focusRequesters, checkTransformation,
                                 dragModifier = reorderDrag(item.id, afterLongPress = false),
                             )
-                            is ImageBlock -> ImageRow(b, reorderDrag(item.id, afterLongPress = true), onResize = { w -> s.setImageWidth(b.id, w) }, onRemove = { s.remove(b.id) }, onExtract = {
+                            is ImageBlock -> ImageRow(b, imageDrag(b), onResize = { w -> s.setImageWidth(b.id, w) }, onAlign = { a -> s.setImageAlign(b.id, a) }, onRemove = { s.remove(b.id) }, onExtract = {
                                 Toast.makeText(ctx, "Reading the text…", Toast.LENGTH_SHORT).show()
                                 Ocr.extract(ctx, b.path) { text ->
                                     if (text.isNullOrBlank()) Toast.makeText(ctx, "No text found in this picture.", Toast.LENGTH_SHORT).show()
@@ -721,6 +810,7 @@ private fun TextRow(
     frs: HashMap<Long, FocusRequester>,
     transformation: NoteTransformation,
     placeholder: String?,
+    onLayout: (androidx.compose.ui.text.TextLayoutResult) -> Unit = {},
 ) {
     val fr = frs.getOrPut(item.id) { FocusRequester() }
     val keeper = rememberCursorKeeper(item, transformation)
@@ -733,7 +823,7 @@ private fun TextRow(
             cursorBrush = SolidColor(C.accent),
             visualTransformation = transformation,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-            onTextLayout = { keeper.layout = it },
+            onTextLayout = { keeper.layout = it; onLayout(it) },
             modifier = Modifier
                 .fillMaxWidth()
                 .bringIntoViewRequester(keeper.requester)
@@ -854,7 +944,7 @@ private fun StepButton(icon: androidx.compose.ui.graphics.vector.ImageVector, de
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ImageRow(b: ImageBlock, dragModifier: Modifier, onResize: (Float) -> Unit, onRemove: () -> Unit, onExtract: () -> Unit) {
+private fun ImageRow(b: ImageBlock, dragModifier: Modifier, onResize: (Float) -> Unit, onAlign: (String) -> Unit, onRemove: () -> Unit, onExtract: () -> Unit) {
     var bmp by remember(b.path) { mutableStateOf<ImageBitmap?>(null) }
     var failed by remember(b.path) { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -865,14 +955,17 @@ private fun ImageRow(b: ImageBlock, dragModifier: Modifier, onResize: (Float) ->
     // Resizing: drag the round handle at the bottom-right corner; the size is saved when you let go.
     var width by remember(b.id, b.width) { mutableFloatStateOf(b.width) }
     var full by remember { mutableIntStateOf(1) }
+    // A narrower picture sits on the left, in the middle or on the right of its own line.
+    val leftPx = when (b.align) { ImageBlock.CENTER -> full * (1 - width) / 2; ImageBlock.RIGHT -> full * (1 - width); else -> 0f }
     Box(Modifier.fillMaxWidth().onSizeChanged { full = it.width.coerceAtLeast(1) }) {
         Box(
             Modifier
+                .align(when (b.align) { ImageBlock.CENTER -> Alignment.TopCenter; ImageBlock.RIGHT -> Alignment.TopEnd; else -> Alignment.TopStart })
                 .fillMaxWidth(width)
                 .border(1.dp, C.menuBorder)
                 .then(dragModifier) // hold and drag to move the picture
                 .clickable { menu = true }
-                .semantics { contentDescription = "Picture. Tap for options, hold and drag to move" },
+                .semantics { contentDescription = "Picture. Tap for options; hold and drag to move it up, down, or left and right" },
         ) {
             val img = bmp
             if (img != null) Image(img, null, Modifier.fillMaxWidth().aspectRatio(img.width.toFloat() / img.height.coerceAtLeast(1)), contentScale = ContentScale.Fit)
@@ -883,7 +976,7 @@ private fun ImageRow(b: ImageBlock, dragModifier: Modifier, onResize: (Float) ->
         // The resize handle sits on the picture's bottom-right corner.
         Box(
             Modifier
-                .offset(x = with(LocalDensity.current) { (full * width).toDp() } - 22.dp, y = 0.dp)
+                .offset(x = with(LocalDensity.current) { (leftPx + full * width).toDp() } - 22.dp, y = 0.dp)
                 .align(Alignment.BottomStart)
                 .size(32.dp)
                 .pointerInput(b.id) {
@@ -905,6 +998,12 @@ private fun ImageRow(b: ImageBlock, dragModifier: Modifier, onResize: (Float) ->
             // The same sizes from a menu, for anyone who'd rather not drag.
             UMenuItem("Full width", { menu = false; width = 1f; onResize(1f) }, UI.Image)
             UMenuItem("Half width", { menu = false; width = 0.5f; onResize(0.5f) }, UI.Image)
+            if (width < 1f) {
+                UMenuDivider()
+                listOf(ImageBlock.LEFT to "Left", ImageBlock.CENTER to "Centre", ImageBlock.RIGHT to "Right").forEach { (a, name) ->
+                    UMenuItem(name, { menu = false; onAlign(a) }, null, trailing = if (b.align == a) "✓" else null)
+                }
+            }
             UMenuItem("Remove picture", { menu = false; onRemove() }, UI.Trash, iconTint = C.danger, color = C.danger)
         }
     }
@@ -1037,3 +1136,6 @@ private fun LinkPicker(notes: List<Note>, onPick: (String) -> Unit, onDismiss: (
         }
     }
 }
+
+/** Where a dragged picture will be dropped: next to [anchorId], or splitting that paragraph at [splitAt]. */
+private data class ImageDrop(val anchorId: Long, val before: Boolean, val splitAt: Int?, val lineY: Float)

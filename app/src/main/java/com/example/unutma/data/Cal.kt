@@ -101,7 +101,8 @@ object Cal {
     }
 
     /**
-     * Adds an event. [repeat] is NONE / DAILY / WEEKLY / MONTHLY / YEARLY, [reminderMinutes] null for none.
+     * Adds an event. [repeat] is NONE / DAILY / WEEKLY / MONTHLY / YEARLY. It always alerts at its start;
+     * [reminderMinutes] adds one more reminder that long before (null for none).
      * Returns the new event's id, or null if the calendar refused it.
      */
     fun insert(
@@ -126,18 +127,80 @@ object Cal {
         return try {
             val uri = ctx.contentResolver.insert(CalendarContract.Events.CONTENT_URI, v) ?: return null
             val id = ContentUris.parseId(uri)
-            if (reminderMinutes != null) {
-                val r = ContentValues()
-                r.put(CalendarContract.Reminders.EVENT_ID, id)
-                r.put(CalendarContract.Reminders.MINUTES, reminderMinutes)
-                r.put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
-                ctx.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, r)
-            }
+            setReminders(ctx, id, reminderMinutes)
             id
         } catch (_: Exception) { null }
     }
 
     private fun localDayToUtc(localMs: Long): Long = Routines.dayOf(localMs) * 24L * 60 * 60 * 1000
+
+    /** What the event sheet needs to edit an event: its whole-series start, repeat rule and extra reminder. */
+    data class Details(val seriesStart: Long, val repeat: String, val extraReminder: Int?)
+
+    fun details(ctx: Context, eventId: Long): Details? {
+        if (!canRead(ctx)) return null
+        return try {
+            val proj = arrayOf(CalendarContract.Events.DTSTART, CalendarContract.Events.RRULE)
+            val (start, rrule) = ctx.contentResolver.query(
+                ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId), proj, null, null, null,
+            )?.use { c -> if (c.moveToFirst()) c.getLong(0) to c.getString(1) else null } ?: return null
+            val freq = rrule?.let { Regex("FREQ=(\\w+)").find(it)?.groupValues?.get(1) } ?: "NONE"
+            val minutes = ArrayList<Int>()
+            ctx.contentResolver.query(
+                CalendarContract.Reminders.CONTENT_URI, arrayOf(CalendarContract.Reminders.MINUTES),
+                "${CalendarContract.Reminders.EVENT_ID} = ?", arrayOf(eventId.toString()), null,
+            )?.use { c -> while (c.moveToNext()) minutes += c.getInt(0) }
+            Details(start, if (freq in setOf("DAILY", "WEEKLY", "MONTHLY", "YEARLY")) freq else "NONE", minutes.filter { it > 0 }.minOrNull())
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * Saves changes to an event. For a repeating one, [instanceBegin] is the occurrence you opened:
+     * moving its time moves every repeat by the same amount, rather than restarting the series there.
+     */
+    fun update(
+        ctx: Context, eventId: Long, instanceBegin: Long, calendarId: Long, title: String, start: Long, end: Long, allDay: Boolean,
+        reminderMinutes: Int?, repeat: String,
+    ): Boolean {
+        if (!canWrite(ctx)) return false
+        val d = details(ctx, eventId) ?: return false
+        val v = ContentValues()
+        v.put(CalendarContract.Events.CALENDAR_ID, calendarId)
+        v.put(CalendarContract.Events.TITLE, title)
+        v.put(CalendarContract.Events.ALL_DAY, if (allDay) 1 else 0)
+        v.put(CalendarContract.Events.EVENT_TIMEZONE, if (allDay) "UTC" else TimeZone.getDefault().id)
+        val repeating = repeat != "NONE"
+        // For a series, keep its first day and shift it by however much this occurrence moved.
+        val newStart = if (repeating && d.repeat != "NONE") d.seriesStart + (start - instanceBegin) else start
+        val (s, e) = if (allDay) localDayToUtc(newStart) to localDayToUtc(newStart) + maxOf(24L * 60 * 60 * 1000, localDayToUtc(end) - localDayToUtc(start))
+        else newStart to newStart + (end - start).coerceAtLeast(0)
+        v.put(CalendarContract.Events.DTSTART, s)
+        if (!repeating) {
+            v.put(CalendarContract.Events.DTEND, e)
+            v.putNull(CalendarContract.Events.RRULE); v.putNull(CalendarContract.Events.DURATION)
+        } else {
+            v.put(CalendarContract.Events.RRULE, "FREQ=$repeat")
+            v.putNull(CalendarContract.Events.DTEND)
+            v.put(CalendarContract.Events.DURATION, if (allDay) "P${((e - s) / (24L * 60 * 60 * 1000)).coerceAtLeast(1)}D" else "PT${((e - s) / 60_000).coerceAtLeast(1)}M")
+        }
+        return try {
+            ctx.contentResolver.update(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId), v, null, null)
+            setReminders(ctx, eventId, reminderMinutes)
+            true
+        } catch (_: Exception) { false }
+    }
+
+    /** Every event alerts when it starts; [extraMinutes] adds one more reminder that long before. */
+    private fun setReminders(ctx: Context, eventId: Long, extraMinutes: Int?) {
+        ctx.contentResolver.delete(CalendarContract.Reminders.CONTENT_URI, "${CalendarContract.Reminders.EVENT_ID} = ?", arrayOf(eventId.toString()))
+        for (m in listOfNotNull(0, extraMinutes?.takeIf { it > 0 })) {
+            val r = ContentValues()
+            r.put(CalendarContract.Reminders.EVENT_ID, eventId)
+            r.put(CalendarContract.Reminders.MINUTES, m)
+            r.put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+            ctx.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, r)
+        }
+    }
 
     /** Deletes the event (every repeat of it). */
     fun delete(ctx: Context, eventId: Long): Boolean {

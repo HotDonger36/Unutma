@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget picker preview (sample content). Generated from widget_countdown.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/w_cd_root" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/widget_bg" android:orientation="vertical" android:padding="16dp">
+    <TextView android:id="@+id/w_cd_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:fontFamily="@font/geist_semibold" android:letterSpacing="0.1" android:maxLines="1" android:text="TRAVEL" android:textColor="#F2B84B" android:textSize="11sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:baselineAligned="true" android:gravity="bottom" android:orientation="horizontal">
+        <TextView android:id="@+id/w_cd_number" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="@font/geist_mono_light" android:includeFontPadding="false" android:maxLines="1" android:text="3" android:textColor="#F2B84B" android:textSize="56sp" />
+        <TextView android:id="@+id/w_cd_unit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:fontFamily="@font/geist_mono_regular" android:text="days" android:textColor="#F2B84B" android:textSize="13sp" />
+    </LinearLayout>
+    <TextView android:id="@+id/w_cd_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:ellipsize="end" android:fontFamily="@font/geist_medium" android:maxLines="1" android:text="Trip to Porto" android:textColor="#EDEDED" android:textSize="16sp" />
+    <TextView android:id="@+id/w_cd_date" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:fontFamily="@font/geist_mono_regular" android:maxLines="1" android:text="Tue 07:00" android:textColor="#8A8A8A" android:textSize="12sp" />
+</LinearLayout>

@@ -130,7 +130,7 @@ object Notifier {
             else -> blocks.previewLine().ifBlank { "Reminder" }
         }
         val b = NotificationCompat.Builder(ctx, reminderChannel(ctx))
-            .setSmallIcon(R.drawable.ic_stat_unutma)
+            .setSmallIcon(R.drawable.ic_stat_logo)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(if (note.isLocked) text else blocks.plainText().ifBlank { text }))

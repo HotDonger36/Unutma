@@ -25,10 +25,23 @@ data class CheckBlock(
     val qty: Int? = null,         // quantity stepper; null = no stepper
 ) : Block
 
-/** A picture; [width] is the share of the note's width it fills (0.3–1), set by dragging its corner. */
-data class ImageBlock(override val id: Long = newBlockId(), val path: String, val width: Float = 1f) : Block
+/**
+ * A picture on its own line ("top and bottom" wrapping: never text beside it). [width] is the share of
+ * the note's width it fills (0.3–1, drag its corner); [align] is where a narrower one sits on its line.
+ */
+data class ImageBlock(
+    override val id: Long = newBlockId(),
+    val path: String,
+    val width: Float = 1f,
+    val align: String = LEFT,
+) : Block {
+    companion object { const val LEFT = "L"; const val CENTER = "C"; const val RIGHT = "R" }
+}
 
 data class AudioBlock(override val id: Long = newBlockId(), val path: String, val durationMs: Long) : Block
+
+/** Voice files: Unutma records .m4a; Google Keep imports bring .3gp / .amr and others. */
+private val AUDIO_EXTENSIONS = setOf("m4a", "3gp", "amr", "aac", "mp3", "ogg", "opus", "wav")
 
 private val idSeq = AtomicLong(System.nanoTime())
 fun newBlockId(): Long = idSeq.incrementAndGet()
@@ -44,7 +57,9 @@ fun parseBlocks(raw: String, type: String): List<Block> {
     val trimmed = raw.trimStart()
     // An encrypted (locked) note: only its picture and voice files can be seen without unlocking.
     if (Vault.isSealed(trimmed)) {
-        return Vault.mediaPaths(trimmed).map { p -> if (p.endsWith(".m4a")) AudioBlock(path = p, durationMs = 0) else ImageBlock(path = p) }
+        return Vault.mediaPaths(trimmed).map { p ->
+            if (p.substringAfterLast('.').lowercase() in AUDIO_EXTENSIONS) AudioBlock(path = p, durationMs = 0) else ImageBlock(path = p)
+        }
     }
     if (trimmed.startsWith("{\"v\"")) {
         try {
@@ -60,7 +75,11 @@ fun parseBlocks(raw: String, type: String): List<Block> {
                         indent = o.optInt("i", 0).coerceIn(0, 1),
                         qty = if (o.has("q")) o.optInt("q") else null,
                     )
-                    "img" -> out += ImageBlock(path = o.optString("p"), width = o.optDouble("w", 1.0).toFloat().coerceIn(0.3f, 1f))
+                    "img" -> out += ImageBlock(
+                        path = o.optString("p"),
+                        width = o.optDouble("w", 1.0).toFloat().coerceIn(0.3f, 1f),
+                        align = o.optString("a", ImageBlock.LEFT).takeIf { it in setOf(ImageBlock.LEFT, ImageBlock.CENTER, ImageBlock.RIGHT) } ?: ImageBlock.LEFT,
+                    )
                     "audio" -> out += AudioBlock(path = o.optString("p"), durationMs = o.optLong("d"))
                 }
             }
@@ -91,7 +110,11 @@ fun serializeBlocks(blocks: List<Block>): String {
                 if (b.indent > 0) o.put("i", b.indent)
                 if (b.qty != null) o.put("q", b.qty)
             }
-            is ImageBlock -> { o.put("t", "img"); o.put("p", b.path); if (b.width < 1f) o.put("w", b.width.toDouble()) }
+            is ImageBlock -> {
+                o.put("t", "img"); o.put("p", b.path)
+                if (b.width < 1f) o.put("w", b.width.toDouble())
+                if (b.align != ImageBlock.LEFT) o.put("a", b.align)
+            }
             is AudioBlock -> { o.put("t", "audio"); o.put("p", b.path); o.put("d", b.durationMs) }
         }
         arr.put(o)
@@ -158,11 +181,10 @@ fun List<Block>.previewLine(): String {
     return ""
 }
 
-/** Removes **bold**, *italic* and [[link]] markers for previews and exports. */
+/** Removes heading, bold/italic (however combined) and [[link]] markers for previews, widgets and exports. */
 fun stripMarkdown(s: String): String =
     s.replace(Regex("(?m)^#{1,3} "), "")
-        .replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")
-        .replace(Regex("(?<![*\\w])\\*(?!\\s)(.+?)(?<!\\s)\\*(?![*\\w])"), "$1")
+        .let { Emphasis.strip(it) } // bold/italic stars, however they're combined
         .replace(Regex("\\[\\[(.+?)]]"), "$1")
 
 /** Titles of notes linked from this one with [[Title]]. */

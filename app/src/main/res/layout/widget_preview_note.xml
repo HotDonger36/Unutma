@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget picker preview (sample content). Generated from widget_note.xml -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/w_n_root" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/widget_bg" android:orientation="vertical" android:paddingStart="20dp" android:paddingTop="18dp" android:paddingEnd="20dp" android:paddingBottom="18dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+        <ImageView android:id="@+id/w_n_dot" android:layout_width="6dp" android:layout_height="6dp" android:contentDescription="@null" android:src="@drawable/w_dot" />
+        <TextView android:id="@+id/w_n_label" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:layout_weight="1" android:ellipsize="end" android:fontFamily="@font/geist_semibold" android:letterSpacing="0.1" android:maxLines="1" android:text="PERSONAL" android:textColor="#A98BFF" android:textSize="11sp" />
+        <LinearLayout android:id="@+id/w_n_remind" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:visibility="visible">
+            <ImageView android:id="@+id/w_n_bell" android:layout_width="11dp" android:layout_height="11dp" android:contentDescription="Reminder" android:src="@drawable/ic_w_bell" />
+            <TextView android:id="@+id/w_n_remind_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="5dp" android:fontFamily="@font/geist_mono_regular" android:text="Mon 09:30" android:textColor="#A98BFF" android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+    <TextView android:id="@+id/w_n_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:fontFamily="@font/geist_medium" android:maxLines="1" android:text="Don't forget" android:textColor="#EDEDED" android:textSize="17sp" />
+    <TextView android:id="@+id/w_n_body" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:fontFamily="@font/geist_regular" android:lineSpacingExtra="2dp" android:maxLines="3" android:text="Dentist on Monday. Bring the health card." android:textColor="#8A8A8A" android:textSize="14sp" />
+</LinearLayout>

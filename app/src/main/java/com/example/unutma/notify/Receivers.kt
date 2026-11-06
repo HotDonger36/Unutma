@@ -95,6 +95,7 @@ class BootReceiver : BroadcastReceiver() {
     companion object {
         suspend fun restoreAll(ctx: Context) {
             Repo.maintenance(ctx)
+            CalendarWatch.schedule(ctx)
             val labels = Repo.labels(ctx).all()
             val now = System.currentTimeMillis()
             for (n in Repo.notes(ctx).activeNow()) {

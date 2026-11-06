@@ -121,6 +121,24 @@ class Prefs private constructor(context: Context) {
     fun bestStreak(noteId: Int): Int = sp.getInt("best_streak_$noteId", 0)
     fun setBestStreak(noteId: Int, n: Int) = sp.edit().putInt("best_streak_$noteId", n).apply()
 
+    /** Every stored value (for backups). */
+    fun all(): Map<String, *> = sp.all
+
+    /** Writes values from a backup and reloads the settings, so every screen picks them up. */
+    fun putAll(values: Map<String, Any>) {
+        val e = sp.edit()
+        for ((k, v) in values) when (v) {
+            is Boolean -> e.putBoolean(k, v)
+            is Int -> e.putInt(k, v)
+            is Long -> e.putLong(k, v)
+            is Float -> e.putFloat(k, v)
+            is Set<*> -> e.putStringSet(k, v.map { it.toString() }.toSet())
+            else -> e.putString(k, v.toString())
+        }
+        e.commit()
+        _state.value = load()
+    }
+
     /** Plain string values (routine progress is kept as a small JSON object). null removes it. */
     fun raw(key: String): String? = sp.getString(key, null)
     fun setRaw(key: String, value: String?) = sp.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()

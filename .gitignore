@@ -17,3 +17,6 @@ local.properties
 # Signing keys never go in the repo
 *.jks
 *.keystore
+
+# Signed release builds from Android Studio (attach them to GitHub releases instead)
+/app/release

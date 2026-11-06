@@ -28,6 +28,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import com.example.unutma.Label
 import com.example.unutma.Note
 import com.example.unutma.RESET_DAILY
@@ -88,53 +103,76 @@ fun rememberRoutines(notes: List<Note>, labels: List<Label>): List<RoutineInfo> 
 }
 
 /**
- * Monday to Sunday. Each square fills from the bottom to the share of boxes ticked that day:
- * see-through while unfinished, solid once finished. Today has a coloured border; days the
- * routine isn't due show a small dot.
+ * A row of day squares (a week, Monday first). Each square fills from the bottom to the share of boxes
+ * ticked that day: see-through while unfinished, solid once finished. Today has a coloured border;
+ * days the routine isn't due show a small dot. Under each square: the weekday letter and the date.
+ * With [onDay], tapping a day opens its details.
  */
 @Composable
-fun WeekStrip(week: List<Routines.DaySquare>, color: Color, modifier: Modifier = Modifier, square: androidx.compose.ui.unit.Dp = 18.dp) {
-    val track = C.track
-    val described = week.joinToString(", ") { sq ->
-        Routines.DAY_NAMES[Routines.weekday(sq.day) - 1] + " " + when {
-            !sq.scheduled -> "not due"
-            sq.future -> "to come"
-            else -> "${sq.percent}%"
-        }
-    }
-    Row(modifier.semantics { contentDescription = "This week: $described" }, horizontalArrangement = Arrangement.SpaceBetween) {
+fun WeekStrip(
+    week: List<Routines.DaySquare>,
+    color: Color,
+    modifier: Modifier = Modifier,
+    square: androidx.compose.ui.unit.Dp = 18.dp,
+    onDay: ((Routines.DaySquare) -> Unit)? = null,
+) {
+    Row(modifier, horizontalArrangement = Arrangement.SpaceBetween) {
         week.forEach { sq ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Canvas(Modifier.size(square)) {
-                    val r = CornerRadius(4.dp.toPx())
-                    if (!sq.scheduled) {
-                        drawCircle(track, radius = 1.6.dp.toPx(), center = center)
-                        return@Canvas
-                    }
-                    if (sq.percent > 0 && !sq.future) {
-                        val top = size.height * (1 - sq.percent / 100f)
-                        clipRect(top = top) {
-                            drawRoundRect(color.copy(alpha = if (sq.percent >= 100) 1f else 0.4f), cornerRadius = r)
-                        }
-                    }
-                    val sw = (if (sq.isToday) 1.6.dp else 1.dp).toPx()
-                    drawRoundRect(
-                        if (sq.isToday || sq.percent >= 100) color else track,
-                        topLeft = Offset(sw / 2, sw / 2), size = Size(size.width - sw, size.height - sw),
-                        cornerRadius = r, style = Stroke(sw),
-                    )
-                }
+            Column(
+                Modifier.clip(RoundedCornerShape(6.dp))
+                    .then(if (onDay != null) Modifier.clickable(role = Role.Button) { onDay(sq) } else Modifier)
+                    .semantics { contentDescription = daySummary(sq) }
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                DaySquareBox(sq, color, square)
                 Text(
                     Routines.DAY_NAMES[Routines.weekday(sq.day) - 1].take(1),
-                    style = Ty.mono.copy(fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp)),
+                    style = Ty.mono.copy(fontSize = 9.sp),
                     color = if (sq.isToday) C.fg else C.faint,
                 )
+                Text(dateOf(sq.day), style = Ty.mono.copy(fontSize = 10.sp), color = if (sq.isToday) C.fg else C.muted)
             }
         }
     }
 }
 
-/** A small tickable box for "the next task" (routines tab, home card). */
+private fun dateOf(day: Long) = SimpleDateFormat("d", Locale.UK).format(Date(Routines.startOf(day)))
+
+private fun daySummary(sq: Routines.DaySquare): String =
+    SimpleDateFormat("EEEE d MMMM", Locale.UK).format(Date(Routines.startOf(sq.day))) + ": " + when {
+        !sq.scheduled -> "not due"
+        sq.future -> "to come"
+        else -> "${sq.percent}% done"
+    }
+
+/** One day's square, filled to its %. */
+@Composable
+private fun DaySquareBox(sq: Routines.DaySquare, color: Color, size: androidx.compose.ui.unit.Dp) {
+    val track = C.track
+    Canvas(Modifier.size(size)) {
+        val r = CornerRadius(4.dp.toPx())
+        if (!sq.scheduled) {
+            drawCircle(track, radius = 1.6.dp.toPx(), center = center)
+            return@Canvas
+        }
+        if (sq.percent > 0 && !sq.future) {
+            val top = this.size.height * (1 - sq.percent / 100f)
+            clipRect(top = top) {
+                drawRoundRect(color.copy(alpha = if (sq.percent >= 100) 1f else 0.4f), cornerRadius = r)
+            }
+        }
+        val sw = (if (sq.isToday) 1.6.dp else 1.dp).toPx()
+        drawRoundRect(
+            if (sq.isToday || sq.percent >= 100) color else track,
+            topLeft = Offset(sw / 2, sw / 2), size = Size(this.size.width - sw, this.size.height - sw),
+            cornerRadius = r, style = Stroke(sw),
+        )
+    }
+}
+
+/** A small tickable box for "the next task". */
 @Composable
 private fun TickBox(color: Color, description: String, onTick: () -> Unit) {
     Box(
@@ -150,10 +188,49 @@ private fun streakText(r: RoutineInfo): String {
     return if (r.best > r.streak) "$s · best ${r.best}" else s
 }
 
+/** What happened on a past day: its %, and which items were ticked. */
+@Composable
+private fun DayDetailsDialog(r: RoutineInfo, sq: Routines.DaySquare, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val ticked = remember(r.note.id, sq.day) { Routines.ticked(ctx, r.note.id, sq.day) }
+    UDialog(onDismiss, SimpleDateFormat("EEEE d MMMM", Locale.UK).format(Date(Routines.startOf(sq.day)))) {
+        Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                DaySquareBox(sq, r.color, 28.dp)
+                Text(
+                    when {
+                        !sq.scheduled -> "Not due this day"
+                        sq.future -> "Still to come"
+                        else -> "${sq.percent}% done"
+                    },
+                    style = Ty.rowTitle, color = C.fg,
+                )
+            }
+            when {
+                sq.future -> Unit
+                ticked == null -> Text("Which items were ticked is only kept from version 1.2 on.", style = Ty.rowSub, color = C.muted)
+                ticked.isEmpty() -> Text("Nothing was ticked.", style = Ty.rowSub, color = C.muted)
+                else -> ticked.forEach { t ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.size(14.dp).clip(RoundedCornerShape(3.dp)).background(r.color))
+                        Text(t, style = Ty.row, color = C.body)
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Spacer(Modifier.weight(1f))
+            TextButtonU("Close", onDismiss)
+        }
+    }
+}
+
 // ─── Routines tab ────────────────────────────────────────────────────────────
 
 @Composable
 fun RoutinesScreen(routines: List<RoutineInfo>, onOpen: (Note) -> Unit, onTick: (Note, Int) -> Unit) {
+    var dayFor by remember { mutableStateOf<Pair<RoutineInfo, Routines.DaySquare>?>(null) }
+    var monthFor by remember { mutableStateOf<RoutineInfo?>(null) }
     Column(Modifier.fillMaxSize().background(C.bg).statusBarsPadding()) {
         Text("Routines", style = Ty.screenTitle, color = C.fg, modifier = Modifier.padding(start = 24.dp, top = 30.dp, bottom = 6.dp))
         Text(
@@ -171,11 +248,18 @@ fun RoutinesScreen(routines: List<RoutineInfo>, onOpen: (Note) -> Unit, onTick: 
         }
         LazyColumn(contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 40.dp)) {
             items(routines, key = { it.note.id }) { r ->
+                // Swipe the week back to earlier weeks (0 = this week).
+                var weeksBack by remember(r.note.id) { mutableIntStateOf(0) }
+                val ctx = LocalContext.current
+                val hist = remember(r.note) { Routines.history(ctx, r.note.id) }
+                val monday = Routines.mondayOf(Routines.today()) - 7L * weeksBack
+                val week = remember(r.note, weeksBack) { Routines.days(r.note.resetMode, hist, monday, 7) }
                 Column(Modifier.fillMaxWidth().clickable { onOpen(r.note) }.padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Dot(r.color, 8.dp)
                         Text(r.title, style = Ty.rowTitle, color = C.fg, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         Text(streakText(r), style = Ty.mono, color = r.color)
+                        IconBtn(UI.Calendar, "Month view", { monthFor = r }, tint = C.muted, iconSize = 16.dp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         when {
@@ -189,47 +273,124 @@ fun RoutinesScreen(routines: List<RoutineInfo>, onOpen: (Note) -> Unit, onTick: 
                         Spacer(Modifier.weight(0.01f))
                         Text("${r.done}/${r.total}", style = Ty.mono, color = C.muted)
                     }
-                    WeekStrip(r.week, r.color, Modifier.fillMaxWidth())
+                    SwipeWeeks(
+                        weeksBack,
+                        onChange = { weeksBack = it.coerceAtLeast(0) },
+                        label = if (weeksBack == 0) "This week" else "Week of " + SimpleDateFormat("d MMM", Locale.UK).format(Date(Routines.startOf(monday))),
+                    ) { WeekStrip(week, r.color, Modifier.fillMaxWidth(), onDay = { sq -> dayFor = r to sq }) }
                     Text(Routines.describe(r.note.resetMode), style = Ty.mono, color = C.faint)
                 }
                 HDivider()
             }
         }
     }
+    dayFor?.let { (r, sq) -> DayDetailsDialog(r, sq) { dayFor = null } }
+    monthFor?.let { r -> RoutineMonthSheet(r, onDay = { sq -> dayFor = r to sq }) { monthFor = null } }
 }
 
-// ─── Daily card on the notes screen ──────────────────────────────────────────
-
 /**
- * Above the labels: today's unfinished routines with their next task (tick it right there) and
- * streak. Tapping the card opens the Routines tab.
+ * Wraps a strip you can swipe sideways: right for further back, left to come forward again. [page]
+ * counts back from the current one. Screen readers get "Earlier" / "Later" actions.
  */
 @Composable
-fun RoutineHomeCard(routines: List<RoutineInfo>, onTick: (Note, Int) -> Unit, onOpenTab: () -> Unit, modifier: Modifier = Modifier) {
-    val due = routines.filter { it.dueToday }
-    if (due.isEmpty()) return
-    val open = due.filter { it.nextText != null }
-    val best = due.maxByOrNull { it.streak }
-    Column(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).border(1.dp, C.menuBorder, RoundedCornerShape(16.dp))
-            .clickable(onClickLabel = "Open routines", onClick = onOpenTab).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
+private fun SwipeWeeks(page: Int, onChange: (Int) -> Unit, label: String, content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    val limit = with(density) { 56.dp.toPx() }
+    var dx by remember { mutableFloatStateOf(0f) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("TODAY", style = Ty.section, color = C.fg, modifier = Modifier.weight(1f))
-            if (best != null && best.streak > 0) Text("${best.streak} day streak", style = Ty.mono, color = best.color)
-            Icon(UI.Chevron, null, tint = C.faint, modifier = Modifier.padding(start = 6.dp).size(12.dp))
+            Text(label, style = Ty.mono, color = C.muted, modifier = Modifier.weight(1f))
+            if (page > 0) Text("Back to now", style = Ty.mono, color = C.accent, modifier = Modifier.clickable { onChange(0) })
         }
-        if (open.isEmpty()) {
-            Text("Every routine is done for today.", style = Ty.rowSub, color = C.muted, modifier = Modifier.padding(vertical = 6.dp))
-        } else open.take(3).forEach { r ->
+        Box(
+            Modifier
+                .graphicsLayer { translationX = dx / 3 }
+                .draggable(
+                    orientation = Orientation.Horizontal,
+                    state = rememberDraggableState { d -> dx += d },
+                    onDragStopped = {
+                        if (dx > limit) onChange(page + 1) else if (dx < -limit) onChange(page - 1)
+                        dx = 0f
+                    },
+                )
+                .semantics {
+                    customActions = listOf(
+                        CustomAccessibilityAction("Earlier") { onChange(page + 1); true },
+                        CustomAccessibilityAction("Later") { onChange(page - 1); true },
+                    )
+                },
+        ) { content() }
+    }
+}
+
+/**
+ * A month of the routine: every day a square filled to that day's %, Monday first. Swipe (or use
+ * the arrows) for earlier months; tap a day for its details. Shows the best streak and the month's average.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RoutineMonthSheet(r: RoutineInfo, onDay: (Routines.DaySquare) -> Unit, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var monthsBack by remember { mutableIntStateOf(0) }
+    val hist = remember(r.note) { Routines.history(ctx, r.note.id) }
+    val cal = remember(monthsBack) {
+        Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1); add(Calendar.MONTH, -monthsBack) }
+    }
+    val first = Routines.dayOf(cal.apply { set(Calendar.HOUR_OF_DAY, 12) }.timeInMillis)
+    val length = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val days = Routines.days(r.note.resetMode, hist, first, length)
+    val avg = Routines.average(r.note.resetMode, hist, first until first + length)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = C.menuBg, contentColor = C.fg,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TickBox(r.color, "Tick ${r.nextText}") { onTick(r.note, r.nextIndex) }
-                Column(Modifier.weight(1f)) {
-                    Text(r.nextText!!, style = Ty.row, color = C.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(r.title, style = Ty.mono, color = C.muted, maxLines = 1)
+                Dot(r.color, 8.dp)
+                Spacer(Modifier.width(10.dp))
+                Text(r.title, style = Ty.rowTitle, color = C.fg, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBtn(UI.Back, "Earlier month", { monthsBack++ }, tint = C.fg, iconSize = 16.dp)
+                Text(
+                    SimpleDateFormat("MMMM yyyy", Locale.UK).format(cal.time),
+                    style = Ty.rowTitle, color = C.fg, textAlign = TextAlign.Center, modifier = Modifier.weight(1f),
+                )
+                IconBtn(UI.Chevron, "Later month", { monthsBack = (monthsBack - 1).coerceAtLeast(0) }, tint = C.fg, enabled = monthsBack > 0, iconSize = 16.dp)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Column { Text("BEST STREAK", style = Ty.settingsHeader, color = C.muted); Text("${r.best}", style = Ty.monoValue, color = r.color) }
+                Column { Text("MONTH AVERAGE", style = Ty.settingsHeader, color = C.muted); Text(avg?.let { "$it%" } ?: "–", style = Ty.monoValue, color = r.color) }
+            }
+            SwipeWeeks(monthsBack, onChange = { monthsBack = it.coerceAtLeast(0) }, label = "Swipe for other months") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth()) {
+                        Routines.DAY_NAMES.forEach { n ->
+                            Text(n.take(1), style = Ty.mono, color = C.faint, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                        }
+                    }
+                    // Blank cells before the 1st, so every column is one weekday.
+                    val lead = Routines.weekday(first) - 1
+                    val cells: List<Routines.DaySquare?> = List(lead) { null } + days
+                    cells.chunked(7).forEach { row ->
+                        Row(Modifier.fillMaxWidth()) {
+                            for (i in 0 until 7) {
+                                val sq = row.getOrNull(i)
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                    if (sq != null) Column(
+                                        Modifier.clip(RoundedCornerShape(6.dp)).clickable { onDay(sq) }
+                                            .semantics { contentDescription = daySummary(sq) }.padding(4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp),
+                                    ) {
+                                        DaySquareBox(sq, r.color, 24.dp)
+                                        Text(dateOf(sq.day), style = Ty.mono.copy(fontSize = 10.sp), color = if (sq.isToday) C.fg else C.muted)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-                Text("${r.done}/${r.total}", style = Ty.mono, color = r.color)
             }
         }
     }

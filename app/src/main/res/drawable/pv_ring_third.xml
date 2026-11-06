@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget picker preview only: a progress ring, one of three done -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp" android:height="28dp" android:viewportWidth="28" android:viewportHeight="28">
+    <path android:strokeColor="#333333" android:strokeWidth="3" android:pathData="M14,3 a11,11 0 1,1 0,22 a11,11 0 1,1 0,-22" />
+    <path android:strokeColor="#A98BFF" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M14,3 A11,11 0 0,1 23.53,19.50" />
+</vector>

@@ -5,6 +5,18 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -48,13 +60,6 @@ private fun at(daysFromToday: Int, hour: Int, minute: Int = 0): Long = Calendar.
     set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
 }.timeInMillis
 
-private fun nextWeekday(target: Int, hour: Int): Long {
-    val c = Calendar.getInstance()
-    var add = (target - c.get(Calendar.DAY_OF_WEEK) + 7) % 7
-    if (add == 0) add = 7
-    return at(add, hour)
-}
-
 val NAG_OPTIONS = listOf(0 to "Off", 5 to "Every 5 min", 15 to "Every 15 min", 30 to "Every 30 min", 60 to "Every hour")
 
 /** Set a reminder on the note itself: quick picks, any date and time, and nagging. */
@@ -76,12 +81,14 @@ fun ReminderDialog(current: Long?, nagMinutes: Int, onSet: (Long?, Int) -> Unit,
     }
 
     UDialog(onDismiss, "Remind me") {
-        val laterToday = at(0, 18)
-        if (laterToday > now + 30 * 60_000) DialogRow("Later today", { onSet(laterToday, nag); onDismiss() }, UI.Bell, Fmt.time(laterToday))
-        val tomorrow = at(1, 9)
-        DialogRow("Tomorrow", { onSet(tomorrow, nag); onDismiss() }, UI.Bell, Fmt.reminderShort(tomorrow))
-        val monday = nextWeekday(Calendar.MONDAY, 9)
-        DialogRow("Next week", { onSet(monday, nag); onDismiss() }, UI.Bell, Fmt.reminderShort(monday))
+        // Quick picks counted from now, each showing exactly when it will go off (to the minute).
+        val minute = now - now % 60_000
+        val inOne = minute + 60 * 60_000L
+        DialogRow("In 1 hour", { onSet(inOne, nag); onDismiss() }, UI.Bell, Fmt.reminderShort(inOne))
+        val inThree = minute + 3 * 60 * 60_000L
+        DialogRow("In 3 hours", { onSet(inThree, nag); onDismiss() }, UI.Bell, Fmt.reminderShort(inThree))
+        val tomorrowSame = Calendar.getInstance().apply { timeInMillis = minute; add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
+        DialogRow("Tomorrow at this time", { onSet(tomorrowSame, nag); onDismiss() }, UI.Bell, Fmt.reminderShort(tomorrowSame))
         DialogRow("Pick date & time", { pickCustom = true }, UI.Calendar)
         UMenuDivider()
         DialogRow("Repeat until done", { pickNag = true }, UI.Repeat, NAG_OPTIONS.firstOrNull { it.first == nag }?.second ?: "Off")
@@ -146,28 +153,70 @@ fun DateTimePicker(initial: Long, withTime: Boolean, onPicked: (Long) -> Unit, o
             )
         }
     } else {
-        val timeState = rememberTimePickerState(
-            initialHour = if (initial > 0) initCal.get(Calendar.HOUR_OF_DAY) else defaultHour,
-            initialMinute = if (initial > 0) initCal.get(Calendar.MINUTE) else 0,
-            is24Hour = true,
-        )
+        var hour by remember { mutableIntStateOf(if (initial > 0) initCal.get(Calendar.HOUR_OF_DAY) else defaultHour) }
+        var minute by remember { mutableIntStateOf(if (initial > 0) initCal.get(Calendar.MINUTE) else 0) }
         UDialog(onDismiss, "Time") {
-            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-                TimePicker(
-                    state = timeState,
-                    colors = TimePickerDefaults.colors(
-                        clockDialColor = C.selected,
-                        selectorColor = C.accent,
-                        timeSelectorSelectedContainerColor = C.selected,
-                        timeSelectorUnselectedContainerColor = C.bg,
-                        timeSelectorSelectedContentColor = C.fg,
-                        timeSelectorUnselectedContentColor = C.muted,
-                    ),
-                )
-            }
+            TimeWheels(hour, minute, { hour = it }, { minute = it }, Modifier.padding(horizontal = 20.dp))
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
                 TextButtonU("Back", { chosenDay = null }, color = C.muted)
-                TextButtonU("Set", { onPicked(Fmt.at(day.first, day.second, day.third, timeState.hour, timeState.minute)) })
+                TextButtonU("Set", { onPicked(Fmt.at(day.first, day.second, day.third, hour, minute)) })
+            }
+        }
+    }
+}
+
+/**
+ * Two wheels, hours (00–23) and minutes (every minute, 00–59), that snap to the middle row.
+ * They go round: flicking past 59 comes back to 00.
+ */
+@Composable
+fun TimeWheels(hour: Int, minute: Int, onHour: (Int) -> Unit, onMinute: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth().height(WHEEL_ROW * 5), contentAlignment = Alignment.Center) {
+        // The band behind the chosen time.
+        Box(Modifier.fillMaxWidth().height(WHEEL_CENTER).clip(RoundedCornerShape(14.dp)).background(C.selected))
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.CenterVertically) {
+            Wheel(24, hour, onHour, C.fg, "Hour")
+            Text(":", style = Ty.monoValue.copy(fontSize = 30.sp), color = C.muted)
+            Wheel(60, minute, onMinute, C.accent, "Minute")
+        }
+    }
+}
+
+private val WHEEL_ROW = 40.dp
+private val WHEEL_CENTER = 50.dp
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Wheel(count: Int, value: Int, onValue: (Int) -> Unit, centerColor: Color, label: String) {
+    // A long list that repeats 0…count-1, started in the middle so it can turn either way.
+    val loops = 400
+    val start = (loops / 2) * count + value
+    val state = rememberLazyListState(initialFirstVisibleItemIndex = start)
+    val fling = rememberSnapFlingBehavior(lazyListState = state)
+    val density = LocalDensity.current
+    val rowPx = with(density) { WHEEL_ROW.toPx() }
+    // The row in the middle of the wheel.
+    val centered by remember {
+        derivedStateOf { state.firstVisibleItemIndex + if (state.firstVisibleItemScrollOffset > rowPx / 2) 1 else 0 }
+    }
+    LaunchedEffect(centered) { onValue(((centered % count) + count) % count) }
+    LazyColumn(
+        state = state,
+        flingBehavior = fling,
+        contentPadding = PaddingValues(vertical = WHEEL_ROW * 2),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(90.dp).height(WHEEL_ROW * 5)
+            .semantics { contentDescription = "$label ${"%02d".format(((centered % count) + count) % count)}" },
+    ) {
+        items(count * loops) { i ->
+            val d = kotlin.math.abs(i - centered)
+            Box(Modifier.height(WHEEL_ROW).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(
+                    "%02d".format(i % count),
+                    style = Ty.monoValue.copy(fontSize = when (d) { 0 -> 34.sp; 1 -> 22.sp; else -> 18.sp }),
+                    color = when (d) { 0 -> centerColor; 1 -> Color(0xFF555555); else -> Color(0xFF2E2E2E) },
+                    maxLines = 1,
+                )
             }
         }
     }

@@ -135,6 +135,12 @@ object Routines {
         val old = o.keys().asSequence().toList().filter { (it.toLongOrNull() ?: 0) < today - 400 }
         old.forEach { o.remove(it) }
         p.setRaw("progress_${note.id}", o.toString())
+        // Which items were ticked today, for a past day's details.
+        val ticked = parseBlocks(note).filterIsInstance<CheckBlock>().filter { it.checked && it.text.isNotBlank() }.map { stripMarkdown(it.text).trim() }
+        val t = try { JSONObject(p.raw("ticks_${note.id}") ?: "{}") } catch (_: Exception) { JSONObject() }
+        t.put(today.toString(), org.json.JSONArray(ticked))
+        t.keys().asSequence().toList().filter { (it.toLongOrNull() ?: 0) < today - 400 }.forEach { t.remove(it) }
+        p.setRaw("ticks_${note.id}", t.toString())
         // The first streak widget's record of completed days stays in step.
         val days = p.doneDays(note.id)
         val updated = if (pct == 100) days + today else days - today
@@ -145,7 +151,7 @@ object Routines {
 
     fun forget(ctx: Context, noteId: Int) {
         val p = Prefs.get(ctx)
-        p.setRaw("progress_$noteId", null); p.clearDoneDays(noteId); p.setBestStreak(noteId, 0)
+        p.setRaw("progress_$noteId", null); p.setRaw("ticks_$noteId", null); p.clearDoneDays(noteId); p.setBestStreak(noteId, 0)
     }
 
     /**
@@ -176,15 +182,29 @@ object Routines {
     fun best(ctx: Context, note: Note): Int =
         maxOf(Prefs.get(ctx).bestStreak(note.id), streak(note.resetMode, history(ctx, note.id)))
 
+    /** The items that were ticked on [day] (null if that day was before this was recorded). */
+    fun ticked(ctx: Context, noteId: Int, day: Long): List<String>? = try {
+        val a = JSONObject(Prefs.get(ctx).raw("ticks_$noteId") ?: "{}").optJSONArray(day.toString())
+        a?.let { arr -> (0 until arr.length()).map { arr.getString(it) } }
+    } catch (_: Exception) { null }
+
+    /** Average % done over the days in [days] the routine was due, up to today; null if none. */
+    fun average(mode: String, hist: Map<Long, Int>, days: LongRange, today: Long = today()): Int? {
+        val due = days.filter { it <= today && (mode == RESET_WEEKLY || isScheduled(mode, it)) }
+        if (due.isEmpty()) return null
+        return due.sumOf { hist[it] ?: 0 } / due.size
+    }
+
     /** One square of a week strip. */
     data class DaySquare(val day: Long, val percent: Int, val scheduled: Boolean, val isToday: Boolean, val future: Boolean)
 
     /** Monday to Sunday of this week. */
-    fun week(mode: String, hist: Map<Long, Int>, today: Long = today()): List<DaySquare> {
-        val monday = mondayOf(today)
-        return (0..6).map { i ->
-            val d = monday + i
+    fun week(mode: String, hist: Map<Long, Int>, today: Long = today()): List<DaySquare> = days(mode, hist, mondayOf(today), 7, today)
+
+    /** [count] squares from [first]. */
+    fun days(mode: String, hist: Map<Long, Int>, first: Long, count: Int, today: Long = today()): List<DaySquare> =
+        (0 until count).map { i ->
+            val d = first + i
             DaySquare(d, hist[d] ?: 0, mode == RESET_WEEKLY || isScheduled(mode, d), d == today, d > today)
         }
-    }
 }

@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -40,7 +41,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsScreen(settings: Settings, onChange: ((Settings) -> Settings) -> Unit, onBack: () -> Unit, onFeedback: () -> Unit, onHelp: () -> Unit) {
+fun SettingsScreen(
+    settings: Settings, onChange: ((Settings) -> Settings) -> Unit, onBack: () -> Unit, onFeedback: () -> Unit, onHelp: () -> Unit,
+    unlock: (onSuccess: () -> Unit) -> Unit,
+) {
     val ctx = LocalContext.current
     var sortDialog by remember { mutableStateOf(false) }
     var archiveDialog by remember { mutableStateOf(false) }
@@ -61,46 +65,36 @@ fun SettingsScreen(settings: Settings, onChange: ((Settings) -> Settings) -> Uni
             SettingsSection("Appearance") {
                 Column(Modifier.padding(top = 12.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Theme", style = Ty.row, color = C.fg)
-                    Desc("Dark or light, or follow your phone's setting.")
                     Segmented(ThemeMode.entries.map { it to it.label }, settings.themeMode) { m -> onChange { it.copy(themeMode = m) } }
                 }
                 HDivider()
                 Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Accent colour", style = Ty.row, color = C.fg)
-                        Desc("Buttons, the cursor and notes without a label.")
-                    }
+                    Text("Accent colour", style = Ty.row, color = C.fg, modifier = Modifier.weight(1f))
                     Box(Modifier.offset(x = 6.dp)) {
                         SwatchRow(ACCENTS.map { it.key }, settings.accentKey, { k -> onChange { it.copy(accentKey = k) } })
                     }
                 }
                 HDivider()
-                ValueRow("Text size", settings.textSize.label, "How big the writing is everywhere in the app.") { sizeDialog = true }
+                ValueRow("Text size", settings.textSize.label) { sizeDialog = true }
             }
 
             SettingsSection("Notes") {
-                ValueRow("Default sort order", settings.sortOrder.label, "The order of notes inside each label. Drag a note to set your own order.") { sortDialog = true }
-                ValueRow(
-                    "Keep recently deleted notes", archiveLabel(settings.archiveDays),
-                    if (settings.archiveDays == ARCHIVE_FOREVER) "Deleted notes wait in Recently deleted until you remove them."
-                    else "Deleted notes wait in Recently deleted this long, then go for good. Archived notes are always kept.",
-                ) { archiveDialog = true }
+                ValueRow("Default sort order", settings.sortOrder.label) { sortDialog = true }
+                ValueRow("Keep recently deleted notes", archiveLabel(settings.archiveDays)) { archiveDialog = true }
             }
 
             SettingsSection("Widgets") {
-                ValueRow("Default widget text size", settings.widgetTextSize.label,
-                    "For new widgets. To change one widget, hold it on the home screen › Widget settings.") { widgetSizeDialog = true }
+                ValueRow("Default widget text size", settings.widgetTextSize.label) { widgetSizeDialog = true }
             }
 
             SettingsSection("Notifications") {
-                SwitchRow("Sound", settings.sound, "Reminders play a sound.") { v -> onChange { it.copy(sound = v) }; Notifier.reminderChannel(ctx) }
-                SwitchRow("Vibration", settings.vibration, "Reminders vibrate.") { v -> onChange { it.copy(vibration = v) }; Notifier.reminderChannel(ctx) }
-                SwitchRow("Show pinned notes opened", settings.pinExpanded,
-                    "Notes pinned to the notification bar sit with your main notifications (still silent), where Android shows the top one opened up.") { v ->
+                SwitchRow("Sound", settings.sound) { v -> onChange { it.copy(sound = v) }; Notifier.reminderChannel(ctx) }
+                SwitchRow("Vibration", settings.vibration) { v -> onChange { it.copy(vibration = v) }; Notifier.reminderChannel(ctx) }
+                SwitchRow("Show pinned notes opened", settings.pinExpanded) { v ->
                     onChange { it.copy(pinExpanded = v) }
                     Repo.scope.launch { Notifier.resyncPins(ctx.applicationContext) }
                 }
-                LinkRow("Android notification settings", UI.External, "Turn Unutma's notifications on or off, or change them in Android.") {
+                LinkRow("Android notification settings", UI.External) {
                     val i = if (Build.VERSION.SDK_INT >= 26) Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS)
                         .putExtra(AndroidSettings.EXTRA_APP_PACKAGE, ctx.packageName)
                     else Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + ctx.packageName))
@@ -108,9 +102,11 @@ fun SettingsScreen(settings: Settings, onChange: ((Settings) -> Settings) -> Uni
                 }
             }
 
+            BackupSection(unlock)
+
             SettingsSection("Help and about") {
-                LinkRow("Help", UI.Chevron, "How everything in Unutma works.", onClick = onHelp)
-                LinkRow("Add the guide notes", UI.PlusBold, "Puts the guide back as notes under a Guide label (ones you still have aren't doubled).") {
+                LinkRow("Help", UI.Chevron, onClick = onHelp)
+                LinkRow("Add the guide notes", UI.PlusBold) {
                     Repo.scope.launch {
                         Guide.add(ctx.applicationContext)
                         withContext(Dispatchers.Main) {
@@ -118,9 +114,19 @@ fun SettingsScreen(settings: Settings, onChange: ((Settings) -> Settings) -> Uni
                         }
                     }
                 }
-                LinkRow("Send feedback", UI.Chevron, "Write to us by email.", onClick = onFeedback)
-                Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Version", style = Ty.row, color = C.fg, modifier = Modifier.weight(1f))
+                LinkRow("Send feedback", UI.Chevron, onClick = onFeedback)
+                // About: the app's icon, name and version.
+                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(
+                        Modifier.size(44.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(androidx.compose.ui.graphics.Color(0xFF0E0E12)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        androidx.compose.foundation.Image(
+                            androidx.compose.ui.res.painterResource(com.example.unutma.R.drawable.ic_launcher_foreground), null,
+                            modifier = Modifier.size(64.dp),
+                        )
+                    }
+                    Text("Unutma", style = Ty.rowTitle, color = C.fg, modifier = Modifier.weight(1f))
                     Text(version, style = Ty.monoValue, color = C.muted)
                 }
             }
@@ -138,12 +144,6 @@ fun SettingsScreen(settings: Settings, onChange: ((Settings) -> Settings) -> Uni
         { v -> onChange { it.copy(widgetTextSize = v) }; com.example.unutma.widget.Widgets.refreshAll(ctx) }, { widgetSizeDialog = false })
 }
 
-/** The short explanation under a setting. */
-@Composable
-private fun Desc(text: String) {
-    Text(text, style = Ty.rowSub, color = C.muted)
-}
-
 @Composable
 private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth()) {
@@ -153,13 +153,10 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
 }
 
 @Composable
-private fun ValueRow(title: String, value: String, desc: String? = null, onClick: () -> Unit) {
+private fun ValueRow(title: String, value: String, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = Ty.row, color = C.fg)
-                if (desc != null) Desc(desc)
-            }
+        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = Ty.row, color = C.fg, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
             Text(value, style = Ty.monoValue, color = C.muted)
             Spacer(Modifier.width(6.dp))
@@ -170,13 +167,10 @@ private fun ValueRow(title: String, value: String, desc: String? = null, onClick
 }
 
 @Composable
-private fun SwitchRow(title: String, checked: Boolean, desc: String? = null, onChange: (Boolean) -> Unit) {
+private fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Column(Modifier.fillMaxWidth().clickable { onChange(!checked) }) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = Ty.row, color = C.fg)
-                if (desc != null) Desc(desc)
-            }
+        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = Ty.row, color = C.fg, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
             MiniSwitch(checked, onChange, title)
         }
@@ -185,13 +179,10 @@ private fun SwitchRow(title: String, checked: Boolean, desc: String? = null, onC
 }
 
 @Composable
-private fun LinkRow(title: String, icon: ImageVector, desc: String? = null, divider: Boolean = true, onClick: () -> Unit) {
+private fun LinkRow(title: String, icon: ImageVector, divider: Boolean = true, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = Ty.row, color = C.fg)
-                if (desc != null) Desc(desc)
-            }
+        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = Ty.row, color = C.fg, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
             Icon(icon, null, tint = C.faint, modifier = Modifier.size(14.dp))
         }

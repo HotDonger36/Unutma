@@ -35,6 +35,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.platform.LocalContext
@@ -104,10 +107,10 @@ fun NotesScreen(
     onArchiveNotes: (ids: Set<Int>) -> Unit,
     onDeleteNotes: (ids: Set<Int>) -> Unit,
     onCreateLabelFor: (ids: Set<Int>, name: String, color: String) -> Unit,
-    /** Shown above the label sections: today's calendar and the routines card. */
-    topContent: @Composable () -> Unit = {},
     /** Called when you drag a note into place while another sort is on: switch to "My order". */
     onSortCustom: () -> Unit = {},
+    /** Label tabs dragged into a new order. */
+    onReorderLabels: (List<Label>) -> Unit = {},
 ) {
     val rows = remember(notes) { notes.map { NoteRow(it, parseBlocks(it)) } }
     var tab by rememberSaveable { mutableStateOf<Int?>(null) }     // null = All
@@ -150,6 +153,7 @@ fun NotesScreen(
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var dragMoved by remember { mutableFloatStateOf(0f) }
     val rowHeights = remember { HashMap<Int, Int>() }
+    val haptic = LocalHapticFeedback.current
     fun orderFor(key: String): List<Int>? =
         if (dragSection == key) dragOrder
         else if (sortOrder == SortOrder.CUSTOM) customOrders.getOrPut(key) { prefs.noteOrder(key) }.takeIf { it.isNotEmpty() }
@@ -159,7 +163,9 @@ fun NotesScreen(
         orderFor(key)?.let { order ->
             // Notes not in your order yet (new ones) go on top, newest first.
             val idx = order.withIndex().associate { it.value to it.index }
+            // Pinned notes always stay above the others, in your order within each group.
             return list.sortedWith(compareBy<NoteRow> { idx[it.note.id] ?: -1 }.thenByDescending { it.note.updatedAt })
+                .sortedByDescending { it.note.isPinned }
         }
         val bySort = when (sortOrder) {
             SortOrder.CUSTOM -> list.sortedWith(compareByDescending<NoteRow> { it.note.updatedAt }.thenByDescending { it.note.id })
@@ -190,9 +196,10 @@ fun NotesScreen(
      * Holding a note: let go without moving and it's selected (as before); drag it and it moves
      * within its section. Dropping it switches the sort to "My order".
      */
-    fun noteDrag(sectionKey: String, sectionIds: List<Int>, id: Int): Modifier = Modifier.pointerInput(sectionKey, id, inSelection, q) {
+    fun noteDrag(sectionKey: String, sectionIds: List<Int>, pinnedIds: Set<Int>, id: Int): Modifier = Modifier.pointerInput(sectionKey, id, inSelection, q) {
         detectDragGesturesAfterLongPress(
             onDragStart = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress) // "you can move it now"
                 dragMoved = 0f; dragOffset = 0f; dragId = id
                 if (!inSelection && q.isEmpty()) { dragSection = sectionKey; dragOrder = sectionIds }
             },
@@ -212,13 +219,19 @@ fun NotesScreen(
             dragOffset += amount.y; dragMoved += amount.y
             val list = dragOrder.toMutableList()
             val i = list.indexOf(id)
-            if (dragOffset > 0 && i in 0 until list.lastIndex) {
+            val pinned = id in pinnedIds
+            // A note only swaps with neighbours of its own kind: pinned among pinned, normal among normal.
+            if (dragOffset > 0 && i in 0 until list.lastIndex && (list[i + 1] in pinnedIds) == pinned) {
                 val h = rowHeights[list[i + 1]] ?: 0
                 if (h > 0 && dragOffset > h / 2f) { list.add(i + 1, list.removeAt(i)); dragOffset -= h; dragOrder = list }
-            } else if (dragOffset < 0 && i > 0) {
+            } else if (dragOffset < 0 && i > 0 && (list[i - 1] in pinnedIds) == pinned) {
                 val h = rowHeights[list[i - 1]] ?: 0
                 if (h > 0 && -dragOffset > h / 2f) { list.add(i - 1, list.removeAt(i)); dragOffset += h; dragOrder = list }
             }
+            // At the edge of its group it stays put instead of sliding over the other group.
+            val before = list.getOrNull(i - 1); val after = list.getOrNull(i + 1)
+            if (dragOffset < 0 && (before == null || (before in pinnedIds) != pinned)) dragOffset = dragOffset.coerceAtLeast(-12f)
+            if (dragOffset > 0 && (after == null || (after in pinnedIds) != pinned)) dragOffset = dragOffset.coerceAtMost(12f)
         }
     }
 
@@ -285,13 +298,11 @@ fun NotesScreen(
             // ─── Label tabs ───
             if (labels.isNotEmpty()) {
                 Spacer(Modifier.height(if (searching) 6.dp else 22.dp))
-                LabelTabs(labels, tab) { tab = it }
+                LabelTabs(labels, tab, { tab = it }, onReorderLabels)
             }
 
             // ─── Sections ───
-            val showTop = tab == null && !searching && !inSelection
             if (sections.isEmpty()) {
-                if (showTop) Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp)) { topContent() }
                 EmptyState(
                     hasNotes = rows.isNotEmpty(),
                     filtered = q.isNotEmpty() || filters.isNotEmpty() || tab != null,
@@ -303,7 +314,6 @@ fun NotesScreen(
                     Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 120.dp),
                 ) {
-                    if (showTop) item(key = "top") { Column(verticalArrangement = Arrangement.spacedBy(22.dp)) { topContent(); Spacer(Modifier.height(0.dp)) } }
                     sections.forEachIndexed { si, s ->
                         // Only folds in the All view; a label's own tab always shows its notes.
                         val folded = tab == null && q.isEmpty() && s.key in collapsed
@@ -334,7 +344,7 @@ fun NotesScreen(
                                         else onOpen(r.note)
                                     },
                                     onSelect = { selection = selection + r.note.id },
-                                    holdModifier = noteDrag(s.key, s.rows.map { it.note.id }, r.note.id),
+                                    holdModifier = noteDrag(s.key, s.rows.map { it.note.id }, s.rows.filter { it.note.isPinned }.map { it.note.id }.toSet(), r.note.id),
                                 )
                             }
                         }
@@ -418,14 +428,50 @@ private fun FabOption(label: String, icon: androidx.compose.ui.graphics.vector.I
 }
 
 @Composable
-private fun LabelTabs(labels: List<Label>, selected: Int?, onSelect: (Int?) -> Unit) {
+private fun LabelTabs(labels: List<Label>, selected: Int?, onSelect: (Int?) -> Unit, onReorder: (List<Label>) -> Unit) {
+    // Hold a label (a short vibration says it's picked up), drag it left or right, let go to drop it. "All" stays first.
+    val haptic = LocalHapticFeedback.current
+    val gapPx = with(LocalDensity.current) { 18.dp.toPx() }
+    val order = remember { mutableStateListOf<Label>().apply { addAll(labels) } }
+    var dragId by remember { mutableStateOf<Int?>(null) }
+    var dragDx by remember { mutableFloatStateOf(0f) }
+    val widths = remember { HashMap<Int, Float>() }
+    LaunchedEffect(labels) { if (dragId == null) { order.clear(); order.addAll(labels) } }
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Tab("All", null, selected == null) { onSelect(null) }
-            labels.forEach { l -> Tab(l.name, labelColor(l.color), selected == l.id) { onSelect(l.id) } }
+            order.forEach { l ->
+                key(l.id) {
+                    val dragging = dragId == l.id
+                    Box(
+                        Modifier
+                            .onSizeChanged { widths[l.id] = it.width + gapPx }
+                            .zIndex(if (dragging) 1f else 0f)
+                            .graphicsLayer { translationX = if (dragging) dragDx else 0f; alpha = if (dragging) 0.85f else 1f }
+                            .pointerInput(l.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); dragId = l.id; dragDx = 0f },
+                                    onDragEnd = { dragId = null; dragDx = 0f; onReorder(order.toList()) },
+                                    onDragCancel = { dragId = null; dragDx = 0f },
+                                ) { change, amount ->
+                                    change.consume()
+                                    dragDx += amount.x
+                                    val i = order.indexOfFirst { it.id == l.id }
+                                    if (dragDx > 0 && i in 0 until order.lastIndex) {
+                                        val w = widths[order[i + 1].id] ?: 0f
+                                        if (w > 0 && dragDx > w / 2f) { order.add(i + 1, order.removeAt(i)); dragDx -= w }
+                                    } else if (dragDx < 0 && i > 0) {
+                                        val w = widths[order[i - 1].id] ?: 0f
+                                        if (w > 0 && -dragDx > w / 2f) { order.add(i - 1, order.removeAt(i)); dragDx += w }
+                                    }
+                                }
+                            },
+                    ) { Tab(l.name, labelColor(l.color), selected == l.id) { onSelect(l.id) } }
+                }
+            }
         }
         HDivider(modifier = Modifier.padding(horizontal = 24.dp))
     }

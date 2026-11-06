@@ -37,9 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.unutma.ui.CalendarScreen
 import com.example.unutma.ui.HomeScaffold
 import com.example.unutma.ui.HomeTab
-import com.example.unutma.ui.RoutineHomeCard
 import com.example.unutma.ui.RoutinesScreen
-import com.example.unutma.ui.TodayBlock
 import com.example.unutma.ui.rememberRoutines
 import com.example.unutma.ui.ArchiveScreen
 import com.example.unutma.ui.EditorScreen
@@ -93,6 +91,7 @@ class MainActivity : ComponentActivity() {
         Repo.scope.launch {
             com.example.unutma.data.Guide.seedIfNeeded(applicationContext) // guide notes on first launch
             Repo.maintenance(applicationContext)
+            com.example.unutma.notify.CalendarWatch.schedule(applicationContext)
         }
 
         setContent {
@@ -233,11 +232,8 @@ fun UnutmaApp(settings: Settings, incoming: MutableState<Intent?>, unlock: (() -
                 openNewEvent = newEventRequested,
                 onNewEventShown = { newEventRequested = false },
             )
+            // "All" lists just your notes: events live in the Calendar tab, routines in the Routines tab.
             HomeTab.NOTES -> NotesScreen(
-                topContent = {
-                    TodayBlock(0, onOpenCalendar = { homeTab = HomeTab.CALENDAR }, onOpenNote = { id -> notes.firstOrNull { it.id == id }?.let(::open) })
-                    RoutineHomeCard(routines, onTick = ::tick, onOpenTab = { homeTab = HomeTab.ROUTINES })
-                },
                 notes = notes,
                 labels = labels,
                 sortOrder = settings.sortOrder,
@@ -246,6 +242,12 @@ fun UnutmaApp(settings: Settings, incoming: MutableState<Intent?>, unlock: (() -
                 onVoice = ::talk,
                 onArchive = { push(Route.Archive) },
                 onDeleted = { push(Route.Deleted) },
+                onReorderLabels = { list ->
+                    scope.launch {
+                        list.forEachIndexed { i, x -> if (x.position != i) Repo.labels(ctx).update(x.copy(position = i)) }
+                        com.example.unutma.widget.Widgets.refreshAll(ctx)
+                    }
+                },
                 onSortCustom = {
                     Prefs.get(ctx).update { it.copy(sortOrder = com.example.unutma.data.SortOrder.CUSTOM) }
                     Toast.makeText(ctx, "Sorted by your order now. Change it in Settings › Sort order.", Toast.LENGTH_SHORT).show()
@@ -299,7 +301,7 @@ fun UnutmaApp(settings: Settings, incoming: MutableState<Intent?>, unlock: (() -
                 onManageLabels = { push(Route.Labels()) },
                 unlock = unlock,
             )
-            Route.Settings -> SettingsScreen(settings, { change -> Prefs.get(ctx).update(change) }, ::pop, ::feedback, onHelp = { push(Route.Help) })
+            Route.Settings -> SettingsScreen(settings, { change -> Prefs.get(ctx).update(change) }, ::pop, ::feedback, onHelp = { push(Route.Help) }, unlock = unlock)
             Route.Help -> com.example.unutma.ui.HelpScreen(::pop)
             Route.Archive, Route.Deleted -> ArchiveScreen(
                 // Archive = put away on purpose (kept); Recently deleted = deleted (removed after a while).

@@ -156,6 +156,11 @@
             android:name=".widget.NotesListService"
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
+        <!-- Redraws the calendar widgets when the phone's calendars change -->
+        <service
+            android:name=".notify.CalendarWatch"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <service
             android:name=".widget.ListWidgetService"
             android:exported="false"

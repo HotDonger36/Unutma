@@ -10,12 +10,16 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Built-in notes that explain the app. They are added once, the first time Unutma opens
- * (and again from Settings › About › Add the guide notes). Each note shows the feature it
+ * (and again from Settings › Add the guide notes). Only the three in [MAIN] become notes; all of
+ * them, those three included, are on Settings › Help. Each note shows the feature it
  * explains: the checklist note is a real checklist, the countdown note has a countdown, and so on.
  * They are ordinary notes, so they can be edited or deleted like any other.
  */
 object Guide {
     private const val FLAG = "guide_seeded"
+
+    /** The guide notes a new user finds on the notes screen. The rest are only on the Help page. */
+    private val MAIN = listOf("Welcome to Unutma", "Checklists", "Reminders and dates")
     private const val DAY = 24L * 60 * 60 * 1000
 
     /** One at a time: two quick starts of the app used to add every guide note twice. */
@@ -46,7 +50,7 @@ object Guide {
                 val id = labels.insert(Label(name = "Guide", color = "PURPLE", position = pos)).toInt()
                 Label(id = id, name = "Guide", color = "PURPLE", position = pos)
             }
-        val notes = build(guide.id, System.currentTimeMillis())
+        val notes = build(guide.id, System.currentTimeMillis()).filter { it.title in MAIN }
         val existing = Repo.notes(ctx).activeNow().filter { it.labelId == guide.id }.map { it.title }.toSet()
         for (n in notes.asReversed()) if (n.title !in existing) Repo.save(ctx, n)
     }
@@ -69,7 +73,9 @@ object Guide {
                     • Tap a note to open it. Long-press a note to select several.
                     • The bar at the bottom switches between Notes, Routines (checklists that come back, with streaks) and Calendar (your Google Calendar). In Calendar, swipe the days left or right for other weeks, or tap the month to jump to a date.
 
-                    The other guide notes go into the details. Start with [[Checklists]].
+                    Start with [[Checklists]] and [[Reminders and dates]]. Everything else — labels, routines, writing tricks, pictures, locking notes, backups, the calendar and widgets — is in ⋯ › Settings › Help.
+
+                    Finished with these? Delete them; Settings › Add the guide notes brings them back.
                 """),
             )).copy(isPinned = true),
 
@@ -82,11 +88,11 @@ object Guide {
                 c("Or adding a quantity", indent = 1),
                 c("Eggs", qty = 12),
                 c("Tomatoes, 500 g"),
-                t("Text › checkbox (at the bottom of a note) turns the line you're on into a checkbox, and back. Drag an item by its dots to move it anywhere in the note, even into another list. Next: [[Labels]]."),
+                t("Text › checkbox (at the bottom of a note) turns the line you're on into a checkbox, and back. Drag an item by its dots to move it anywhere in the note, even into another list. Next: [[Reminders and dates]]."),
             ), NOTE_TYPE_LIST),
 
             note("Morning routine", listOf(
-                t("This is a routine: it unticks itself every day and keeps a streak in the Routines tab. Set one up in Details › Repeat (every day, every week, on chosen days or every few days), or use Details › Untick all."),
+                t("This is a routine: it unticks itself every day and keeps a streak in the Routines tab. There, swipe its week back to earlier weeks, tap a day to see what you ticked, or tap the calendar button for the whole month. Set one up in Details › Repeat (every day, every week, on chosen days or every few days), or use Details › Untick all."),
                 c("Drink a glass of water"),
                 c("Take the keys"),
                 c("Check the train times"),
@@ -94,11 +100,11 @@ object Guide {
 
             note("Labels", listOf(
                 t("""
-                    Labels group your notes. Each label becomes a coloured section on the notes screen, and a tab at the top so you can show just that label.
+                    Labels group your notes. Each label becomes a coloured section on the notes screen, and a tab at the top so you can show just that label. Hold a tab and drag it to change the order ("All" stays first).
 
                     • Give a note a label with the chip above its title.
                     • Create, rename and recolour labels in ⋯ › Manage labels, and drag them into the order you like.
-                    • Hold a note and drag it to put the notes in your own order.
+                    • Hold a note until it buzzes, then drag it to put the notes in your own order (pinned notes stay above the others).
                     • Tap a section's title on the notes screen to fold it away; tap again to open it.
                     • Select several notes (long-press) to label, pin, lock, archive or delete them together. The select-all button picks every note on screen.
 
@@ -108,15 +114,15 @@ object Guide {
 
             note("Reminders and dates", listOf(
                 t("""
-                    Tap Remind at the bottom of a note to set a reminder: later today, tomorrow, next week or any date and time. The notification has **Done** and **Snooze** buttons.
+                    Tap Remind at the bottom of a note to set a reminder: in 1 hour, in 3 hours, tomorrow at this time, or any date and time (flick the hour and minute wheels). The notification has **Done** and **Snooze** buttons.
 
                     *Repeat until done* keeps reminding you every few minutes until you tap Done — handy for things you really can't forget.
 
                     Unutma also spots dates you type. Try writing: Call the dentist on Monday 09:30 — a "Remind me?" suggestion appears above the bottom bar.
 
                     In Details you'll also find:
-                    • **Countdown** — shows "in 3d" on the list, like [[Trip countdown]].
-                    • **Expires** — the note moves to Recently deleted on that day, like [[This note expires]].
+                    • **Countdown** — shows "in 3d" on the list (Help › Trip countdown).
+                    • **Expires** — the note moves to Recently deleted on that day (Help › This note expires).
 
                     Dates that are coming up soon are shown in the label's colour on the notes screen.
                 """),
@@ -141,7 +147,7 @@ object Guide {
                     1. Like this
                     2. And this
 
-                    **Bold** and *italic*: select text and tap B or I, or type **two stars** or *one star* around words.
+                    **Bold** and *italic*: select text and tap B or I, or tap them before you type. Both at once works too: ***like this***.
 
                     Maths: end a line with = and the answer appears.
                     Groceries 12,50 + 7,20 + 3 =
@@ -153,9 +159,11 @@ object Guide {
 
             note("Pictures and voice", listOf(
                 t("""
-                    Insert › picture adds a photo where your cursor is — text goes above and below it. Drag its round corner to make it smaller.
+                    Insert › picture adds a photo where your cursor is — text goes above and below it, never beside it. Drag its round corner to make it smaller.
 
-                    Tap a picture and choose **Extract text** to copy the words from it into the note: receipts, tickets, whiteboards. Hold a picture and drag to move it up or down.
+                    Hold a picture and drag it: a line shows where it will go, even into the middle of a paragraph. Drag it left or right (or tap it › Left, Centre, Right) to move a smaller picture along its line.
+
+                    Tap a picture and choose **Extract text** to copy the words from it into the note: receipts, tickets, whiteboards.
 
                     Insert › microphone records a voice note you can play back inside the note.
 
@@ -172,6 +180,12 @@ object Guide {
                     **Archive and Recently deleted**: ⋯ › Archive keeps notes you put away until you restore them. Deleted notes wait in ⋯ › Recently deleted for a week before they're removed (change how long in Settings), so you can restore them. Both keep their label.
 
                     **Share**: ⋯ › Share sends a note as text, a PDF or an image.
+
+                    **Back up**: Settings › Back up puts everything — notes, checklists, labels, the archive, pictures, voice notes, routines and settings — into one .zip. Save it in Downloads or Google Drive, or share it. Locked notes are unlocked for the backup, so it asks for your fingerprint first.
+
+                    **Restore**: Settings › Restore from a backup adds the notes from a backup .zip, on this phone or a new one (or from Unutma (debug) to Unutma). Notes you already have aren't doubled, and reminders and pins are set up again.
+
+                    **From Google Keep**: export Keep at takeout.google.com (just Keep), then Settings › Import from Google Keep and pick the .zip. Notes, checklists, labels, pictures and recordings come across; notes in Keep's trash don't, and importing twice doesn't double them.
                 """),
             )),
 
@@ -184,14 +198,16 @@ object Guide {
                     • **Daily checklist**, **Progress ring** and **Next up** — small checklists you can tick from the home screen.
                     • **Streak** — how many days in a row you've ticked everything.
                     • **Note** — keep a note in view.
-                    • **Agenda**, **Next event** and **This week** — your calendar on the home screen.
-                    • **Notes** — several notes at once, with buttons for a new checklist, talk, note or photo.
+                    • **Agenda**, **Next event** and **This week** — your calendar on the home screen; they update when your events change.
+                    • **Notes** — several notes at once, with a + for a new one.
 
                     Widgets can be resized: long-press one and drag its edges. Long-press › Widget settings changes its text size (and which note, or which label, it shows).
 
-                    In ⋯ › Settings you can change the theme, accent colour, text size, default widget text size, sort order and how long deleted notes are kept, set notification sound and vibration, read Help and send feedback.
+                    In ⋯ › Settings you can change the theme, accent colour, text size, default widget text size, sort order and how long deleted notes are kept, set notification sound and vibration, back up, restore, import from Google Keep, read Help and send feedback.
 
-                    Finished with the guide? Select these notes and delete them. You can bring them back in Settings › About.
+                    **Calendar tab**: swipe the week to go back or forward (Today brings you back), tap a day to see its events, tap an event to change it, swipe it left to delete it. Every event reminds you when it starts; you can add one more reminder before it.
+
+                    Finished with the guide? Select these notes and delete them. You can bring them back in Settings › Add the guide notes.
                 """),
             )),
         )

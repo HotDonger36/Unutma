@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget picker preview only: a day with two events -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp" android:height="58dp" android:viewportWidth="20" android:viewportHeight="58">
+    <path android:fillColor="#4A3D78" android:pathData="M4,42h12a4,4 0 0 1 4,4v8a4,4 0 0 1 -4,4h-12a4,4 0 0 1 -4,-4v-8a4,4 0 0 1 4,-4z" />
+    <path android:fillColor="#4A3D78" android:pathData="M4,23h12a4,4 0 0 1 4,4v8a4,4 0 0 1 -4,4h-12a4,4 0 0 1 -4,-4v-8a4,4 0 0 1 4,-4z" />
+</vector>

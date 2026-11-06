@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget picker preview only: a ticked checkbox -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp" android:height="16dp" android:viewportWidth="16" android:viewportHeight="16">
+    <path android:fillColor="#A98BFF" android:pathData="M3.5,0h9a3.5,3.5 0 0 1 3.5,3.5v9a3.5,3.5 0 0 1 -3.5,3.5h-9a3.5,3.5 0 0 1 -3.5,-3.5v-9a3.5,3.5 0 0 1 3.5,-3.5z" />
+    <path android:strokeColor="#0A0A0A" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M4.3,8.3l2.6,2.6l5,-5.3" />
+</vector>

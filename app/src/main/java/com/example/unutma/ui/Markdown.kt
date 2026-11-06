@@ -13,11 +13,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
+import com.example.unutma.data.Emphasis
 import com.example.unutma.ui.theme.GeistMono
 import com.example.unutma.util.MathEval
 
-private val boldRe = Regex("\\*\\*(.+?)\\*\\*")
-private val italicRe = Regex("(?<![*\\w])\\*(?!\\s)(.+?)(?<!\\s)\\*(?![*\\w])")
 private val linkRe = Regex("\\[\\[(.+?)]]")
 private val headingRe = Regex("^(#{1,3}) ")
 
@@ -34,28 +33,12 @@ const val EMPTY_STYLE = "​"
  */
 internal data class Hidden(val start: Int, val end: Int, val opening: Boolean, val heading: Boolean = false)
 
-/** A bold (`**`) or italic (`*`) stretch: markers at [start]/[end], the styled text between [inner]. */
-internal data class Emphasis(val marker: String, val start: Int, val end: Int) {
-    val inner: IntRange get() = (start + marker.length) until (end - marker.length)
-}
-
-internal fun emphasisSpans(s: String): List<Emphasis> {
-    val out = ArrayList<Emphasis>()
-    for (m in boldRe.findAll(s)) out += Emphasis("**", m.range.first, m.range.last + 1)
-    for (m in italicRe.findAll(s)) {
-        val r = m.range
-        if (out.any { it.start <= r.last && r.first < it.end }) continue
-        out += Emphasis("*", r.first, r.last + 1)
-    }
-    return out.sortedBy { it.start }
-}
-
-/** Every marker the editor hides: bold/italic stars and the "# " in front of headings. */
+/** Every marker the editor hides: bold/italic stars (however combined or nested) and the "# " in front of headings. */
 internal fun hiddenMarkers(s: String): List<Hidden> {
     val out = ArrayList<Hidden>()
-    for (e in emphasisSpans(s)) {
-        out += Hidden(e.start, e.start + e.marker.length, opening = true)
-        out += Hidden(e.end - e.marker.length, e.end, opening = false)
+    for (e in Emphasis.parse(s)) {
+        out += Hidden(e.openStart, e.openEnd, opening = true)
+        out += Hidden(e.closeStart, e.closeEnd, opening = false)
     }
     var lineStart = 0
     while (lineStart <= s.length) {
@@ -72,8 +55,9 @@ internal fun hiddenMarkers(s: String): List<Hidden> {
 fun styleMarkdown(s: String, marker: Color, link: Color): AnnotatedString {
     val b = AnnotatedString.Builder(s)
     val markerStyle = SpanStyle(color = marker)
-    for (e in emphasisSpans(s)) {
-        b.addStyle(if (e.marker == "**") SpanStyle(fontWeight = FontWeight.SemiBold) else SpanStyle(fontStyle = FontStyle.Italic), e.start, e.end)
+    for (e in Emphasis.parse(s)) {
+        if (e.bold) b.addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), e.openStart, e.closeEnd)
+        if (e.italic) b.addStyle(SpanStyle(fontStyle = FontStyle.Italic), e.openStart, e.closeEnd)
     }
     // Heading sizes: "# " = N1 (largest), "## " = N2, "### " = N3.
     var lineStart = 0
@@ -131,7 +115,7 @@ fun fixMarkerEdit(old: TextFieldValue, new: TextFieldValue): TextFieldValue {
                 if (q == null) old else {
                     val cut = o.removeRange(q, q + 1)
                     val cursor = (old.selection.start - 1).coerceIn(0, cut.length)
-                    val e = emphasisSpans(o).firstOrNull { q in it.inner }
+                    val e = Emphasis.parse(o).firstOrNull { q in it.inner }
                     if (e != null && e.inner.first == q && e.inner.last == q) {
                         // That was the only letter: keep the empty style spot.
                         TextFieldValue(cut.substring(0, q) + EMPTY_STYLE + cut.substring(q), TextRange(q + 1))
@@ -164,37 +148,12 @@ private fun dropPlaceholders(v: TextFieldValue): TextFieldValue {
 
 /** The text as it's saved: empty style spots and leftover placeholders removed. */
 fun cleanForSave(s: String): String =
-    s.replace("**$EMPTY_STYLE**", "").replace("*$EMPTY_STYLE*", "").replace(EMPTY_STYLE, "")
+    s.replace(Regex("\\*{1,3}$EMPTY_STYLE\\*{1,3}"), "").replace(EMPTY_STYLE, "")
 
-/**
- * B / I. With text selected: makes it bold/italic, or takes the style off if it already has it.
- * With nothing selected: starts a hidden styled spot to type into — or, inside one, steps out of it
- * (pressing B again ends the bold), removing it if nothing was typed.
- */
+/** B ("**") / I ("*"): see [Emphasis.toggle] — bold and italic can be on together. */
 fun toggleEmphasis(v: TextFieldValue, marker: String): TextFieldValue {
-    val t = v.text
-    val sel = v.selection
-    val spans = emphasisSpans(t).filter { it.marker == marker }
-    if (sel.collapsed) {
-        val cur = sel.start
-        val inside = spans.firstOrNull { cur >= it.inner.first && cur <= it.inner.last + 1 }
-        if (inside != null) {
-            val content = t.substring(inside.inner.first, inside.inner.last + 1)
-            return if (content == EMPTY_STYLE) TextFieldValue(t.removeRange(inside.start, inside.end), TextRange(inside.start))
-            else TextFieldValue(t, TextRange(inside.end)) // step out: carry on typing without the style
-        }
-        val nt = t.substring(0, cur) + marker + EMPTY_STYLE + marker + t.substring(cur)
-        return TextFieldValue(nt, TextRange(cur + marker.length + 1))
-    }
-    // Selection already styled (exactly the text, or the text with its markers): take the style off.
-    val covering = spans.firstOrNull { (sel.min == it.inner.first && sel.max == it.inner.last + 1) || (sel.min == it.start && sel.max == it.end) }
-    if (covering != null) {
-        val inner = t.substring(covering.inner.first, covering.inner.last + 1)
-        val nt = t.substring(0, covering.start) + inner + t.substring(covering.end)
-        return TextFieldValue(nt, TextRange(covering.start, covering.start + inner.length))
-    }
-    val nt = t.substring(0, sel.min) + marker + t.substring(sel.min, sel.max) + marker + t.substring(sel.max)
-    return TextFieldValue(nt, TextRange(sel.max + marker.length * 2))
+    val r = Emphasis.toggle(Emphasis.Edit(v.text, v.selection.start, v.selection.end), marker.length)
+    return TextFieldValue(r.text, TextRange(r.selStart, r.selEnd))
 }
 
 /**

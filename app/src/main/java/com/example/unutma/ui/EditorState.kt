@@ -450,6 +450,36 @@ class EditorState(note: Note, blocks: List<Block>) {
         changed("struct", id)
     }
 
+    /** Left / Centre / Right for a picture narrower than the note. */
+    fun setImageAlign(id: Long, align: String) {
+        val i = indexOf(id); if (i < 0) return
+        val b = items[i].block as? ImageBlock ?: return
+        if (b.align == align) return
+        items[i] = items[i].copy(block = b.copy(align = align))
+        changed("struct", id)
+    }
+
+    /**
+     * Drops a dragged picture next to [anchorId]: before or after it, or — for a paragraph with
+     * [splitAt] — in the middle of it, splitting the text there so the picture has its own line.
+     */
+    fun placeImage(id: Long, anchorId: Long, before: Boolean, splitAt: Int?) {
+        val from = indexOf(id); if (from < 0 || id == anchorId) return
+        val img = items.removeAt(from)
+        val a = indexOf(anchorId)
+        if (a < 0) { items.add(from.coerceAtMost(items.size), img); return }
+        val anchor = items[a]
+        if (splitAt != null && anchor.block is TextBlock && splitAt in 1 until anchor.tfv.text.length) {
+            val t = anchor.tfv.text
+            val top = t.substring(0, splitAt).removeSuffix("\n").trimEnd(' ')
+            val bottom = t.substring(splitAt).removePrefix("\n").trimStart(' ')
+            items[a] = anchor.copy(tfv = TextFieldValue(top))
+            items.add(a + 1, img)
+            items.add(a + 2, EItem(TextBlock(text = bottom), TextFieldValue(bottom)))
+        } else items.add(if (before) a else a + 1, img)
+        normalize(); changed("move", id)
+    }
+
     /** Dragging a picture's corner: how much of the width it fills. */
     fun setImageWidth(id: Long, width: Float) {
         val i = indexOf(id); if (i < 0) return

@@ -10,18 +10,22 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <!-- Margins, not padding, keep the cards inside the rounded frame: the list cuts off what's
+             scrolled past its own edges, 10dp in from the widget's edge, so nothing pokes over the
+             rounded corners. The bottom padding lets the last card scroll up clear of the + button. -->
         <ListView
             android:id="@+id/w_ns_list"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="10dp"
             android:clipToPadding="false"
             android:divider="@null"
             android:dividerHeight="0dp"
-            android:paddingStart="10dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="70dp"
+            android:paddingBottom="60dp"
             android:scrollbars="none" />
 
         <TextView

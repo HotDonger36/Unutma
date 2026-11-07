@@ -18,6 +18,8 @@
 
 Everything stays on your phone; nothing is sent anywhere.
 
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
+
 ## Building
 
 Open the project in Android Studio, or from the project folder:

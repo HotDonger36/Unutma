@@ -198,14 +198,14 @@ object Guide {
                     • **Daily checklist**, **Progress ring** and **Next up** — small checklists you can tick from the home screen.
                     • **Streak** — how many days in a row you've ticked everything.
                     • **Note** — keep a note in view.
-                    • **Agenda**, **Next event** and **This week** — your calendar on the home screen; they update when your events change.
+                    • **Agenda** (your events for the next 30 days), **Next event** and **This week** — your calendar on the home screen; they update when your events change.
                     • **Notes** — several notes at once, with a + for a new one.
 
                     Widgets can be resized: long-press one and drag its edges. Long-press › Widget settings changes its text size (and which note, or which label, it shows).
 
                     In ⋯ › Settings you can change the theme, accent colour, text size, default widget text size, sort order and how long deleted notes are kept, set notification sound and vibration, back up, restore, import from Google Keep, read Help and send feedback.
 
-                    **Calendar tab**: swipe the week to go back or forward (Today brings you back), tap a day to see its events, tap an event to change it, swipe it left to delete it. Every event reminds you when it starts; you can add one more reminder before it.
+                    **Calendar tab**: swipe the week to go back or forward (Today brings you back), tap a day to see its events, or tap it again to see everything in the next 30 days. Tap an event to change it (Delete event is at the bottom), or swipe it left to delete it. Every event reminds you when it starts; you can add one more reminder before it.
 
                     Finished with the guide? Select these notes and delete them. You can bring them back in Settings › Add the guide notes.
                 """),

@@ -134,10 +134,14 @@ private fun EventRow(e: CalEvent, onOpenNote: (Int) -> Unit, onEdit: () -> Unit)
 private const val WEEK_PAGES = 1041
 private const val WEEK_MID = WEEK_PAGES / 2
 
+/** How far ahead the agenda looks when no day is picked. */
+private const val UPCOMING_DAYS = 30
+
 /**
  * Seven days to pick from (swipe the strip for earlier or later weeks, tap the month to jump to a
- * date), then the agenda from the picked day. Swipe an event to the left to delete it; + adds one
- * on the picked day.
+ * date), then the picked day's agenda. Tap the picked day again to unselect it and see the next
+ * 30 days instead. Tap an event to edit or delete it, or swipe it to the left to delete it; + adds
+ * one on the picked day.
  */
 @Composable
 fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: Boolean = false, onNewEventShown: () -> Unit = {}) {
@@ -150,7 +154,8 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
     }
     var version by remember { mutableIntStateOf(0) }
     val today = Routines.today()
-    var picked by remember { mutableLongStateOf(today) }
+    // The picked day, or null when you tap it again to unselect it: then the agenda shows the next 30 days.
+    var picked by remember { mutableStateOf<Long?>(today) }
     var creating by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<CalEvent?>(null) }
     var editing by remember { mutableStateOf<CalEvent?>(null) }
@@ -162,9 +167,11 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
     fun weekStart(page: Int): Long = today + (page - WEEK_MID) * 7L
     fun pageOf(day: Long): Int = (WEEK_MID + Math.floorDiv(day - today, 7L).toInt()).coerceIn(0, WEEK_PAGES - 1)
     // After a swipe, keep the picked day if it's in the new week; otherwise pick the week's first day (today on the start page).
+    // With no day picked, it stays unselected.
     LaunchedEffect(pager.settledPage) {
+        val p = picked ?: return@LaunchedEffect
         val start = weekStart(pager.settledPage)
-        if (picked !in start until start + 7) picked = start
+        if (p !in start until start + 7) picked = start
     }
     fun jumpTo(day: Long) {
         picked = day
@@ -185,10 +192,10 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
                 }
                 // Tap the month to jump to any date.
                 Text(
-                    SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(Routines.startOf(picked))).uppercase(),
+                    SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(Routines.startOf(picked ?: weekStart(pager.currentPage)))).uppercase(),
                     style = Ty.mono, color = C.muted,
                     modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(enabled = granted, onClickLabel = "Pick a date") {
-                        val cal = java.util.Calendar.getInstance().apply { timeInMillis = Routines.startOf(picked) }
+                        val cal = java.util.Calendar.getInstance().apply { timeInMillis = Routines.startOf(picked ?: weekStart(pager.currentPage)) }
                         android.app.DatePickerDialog(
                             ctx, android.R.style.Theme_DeviceDefault_Dialog_Alert,
                             { _, y, m, d ->
@@ -222,7 +229,9 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
                         Column(
                             Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(14.dp)).background(if (on) C.accent else Color.Transparent)
                                 .then(if (d == today && !on) Modifier.border(1.dp, C.accent, RoundedCornerShape(14.dp)) else Modifier)
-                                .clickable(role = Role.Tab) { picked = d }.semantics { contentDescription = dayName(d, today) },
+                                // Tap the picked day again to unselect it and see the next 30 days.
+                                .clickable(role = Role.Tab, onClickLabel = if (on) "Show the next 30 days" else null) { picked = if (on) null else d }
+                                .semantics { contentDescription = dayName(d, today) },
                             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                         ) {
                             Text(Routines.DAY_NAMES[Routines.weekday(d) - 1].uppercase(), style = Ty.mono, color = if (on) C.bg else C.muted)
@@ -236,17 +245,44 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
                     }
                 }
             }
-            // Just the picked day's events.
-            val events = rememberEvents(picked, 1, version)
-            Text(dayName(picked, today).uppercase(), style = Ty.section, color = C.fg, modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 6.dp))
-            HDivider(C.faint, Modifier.padding(horizontal = 24.dp))
-            if (events.isEmpty()) {
-                Box(Modifier.fillMaxSize().padding(40.dp), contentAlignment = Alignment.TopCenter) {
-                    Text("Nothing on this day.", style = Ty.rowSub, color = C.muted)
+            val day = picked
+            if (day != null) {
+                // Just the picked day's events.
+                val events = rememberEvents(day, 1, version)
+                Text(dayName(day, today).uppercase(), style = Ty.section, color = C.fg, modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 6.dp))
+                HDivider(C.faint, Modifier.padding(horizontal = 24.dp))
+                if (events.isEmpty()) {
+                    Box(Modifier.fillMaxSize().padding(40.dp), contentAlignment = Alignment.TopCenter) {
+                        Text("Nothing on this day.", style = Ty.rowSub, color = C.muted)
+                    }
+                } else LazyColumn(contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 120.dp)) {
+                    items(events, key = { "e${it.eventId}_${it.begin}" }) { e ->
+                        SwipeToDelete(onDelete = { deleting = e }) { EventRow(e, onOpenNote = onOpenNote, onEdit = { editing = e }) }
+                    }
                 }
-            } else LazyColumn(contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 120.dp)) {
-                items(events, key = { "e${it.eventId}_${it.begin}" }) { e ->
-                    SwipeToDelete(onDelete = { deleting = e }) { EventRow(e, onOpenNote = onOpenNote, onEdit = { editing = e }) }
+            } else {
+                // No day picked: everything that hasn't ended yet in the next 30 days, under a heading per day.
+                val now = System.currentTimeMillis()
+                val byDay = rememberEvents(today, UPCOMING_DAYS, version).filter { it.end > now }
+                    .groupBy { Routines.dayOf(it.begin).coerceAtLeast(today) }.toSortedMap()
+                Text("NEXT $UPCOMING_DAYS DAYS", style = Ty.section, color = C.fg, modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 6.dp))
+                HDivider(C.faint, Modifier.padding(horizontal = 24.dp))
+                if (byDay.isEmpty()) {
+                    Box(Modifier.fillMaxSize().padding(40.dp), contentAlignment = Alignment.TopCenter) {
+                        Text("Nothing in the next $UPCOMING_DAYS days.", style = Ty.rowSub, color = C.muted)
+                    }
+                } else LazyColumn(contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 120.dp)) {
+                    byDay.forEach { (d, events) ->
+                        item(key = "d$d") {
+                            Text(
+                                dayName(d, today).uppercase(), style = Ty.mono, color = if (d == today) C.accent else C.muted,
+                                modifier = Modifier.fillMaxWidth().clickable(onClickLabel = "Show this day") { jumpTo(d) }.padding(top = 16.dp, bottom = 2.dp),
+                            )
+                        }
+                        items(events, key = { "u${it.eventId}_${it.begin}" }) { e ->
+                            SwipeToDelete(onDelete = { deleting = e }) { EventRow(e, onOpenNote = onOpenNote, onEdit = { editing = e }) }
+                        }
+                    }
                 }
             }
         }
@@ -259,8 +295,11 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
     }
 
     val saved = { version++; Widgets.refreshAll(ctx) }
-    if (creating) EventSheet(notes, picked, editing = null, onDismiss = { creating = false }, onSaved = saved)
-    editing?.let { e -> EventSheet(notes, picked, editing = e, onDismiss = { editing = null }, onSaved = saved) }
+    if (creating) EventSheet(notes, picked ?: today, editing = null, onDismiss = { creating = false }, onSaved = saved)
+    editing?.let { e ->
+        EventSheet(notes, picked ?: Routines.dayOf(e.begin), editing = e, onDismiss = { editing = null }, onSaved = saved,
+            onDelete = { editing = null; deleting = e })
+    }
     deleting?.let { e ->
         ConfirmDialog(
             "Delete “${e.title}”?",
@@ -321,10 +360,10 @@ private fun reminderText(m: Int?): String = when {
     else -> "At the start + $m min before"
 }
 
-/** The event sheet: a new event ([editing] null), or changes to one you tapped. */
+/** The event sheet: a new event ([editing] null), or changes to one you tapped (with a Delete button at the bottom). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EventSheet(notes: List<Note>, day: Long, editing: CalEvent?, onDismiss: () -> Unit, onSaved: () -> Unit) {
+fun EventSheet(notes: List<Note>, day: Long, editing: CalEvent?, onDismiss: () -> Unit, onSaved: () -> Unit, onDelete: (() -> Unit)? = null) {
     val ctx = LocalContext.current
     val calendars by produceState(emptyList<CalInfo>()) { value = withContext(Dispatchers.IO) { Cal.calendars(ctx).filter { it.writable } } }
     var title by remember { mutableStateOf(editing?.title?.takeIf { it != "(No title)" } ?: "") }
@@ -384,6 +423,19 @@ fun EventSheet(notes: List<Note>, day: Long, editing: CalEvent?, onDismiss: () -
             SheetValueRow("Reminder", reminderText(reminder)) { picker = "reminder" }
             SheetValueRow("Repeat", REPEATS.first { it.first == repeat }.second) { picker = "repeat" }
             SheetValueRow("Linked note", noteId?.let { id -> notes.firstOrNull { it.id == id }?.let { noteDisplayTitle(it) } } ?: "None") { picker = "note" }
+            // Editing: delete the event from the bottom of the sheet (it asks first).
+            if (editing != null && onDelete != null) {
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, C.danger, RoundedCornerShape(14.dp))
+                        .clickable(role = Role.Button, onClickLabel = "Delete event", onClick = onDelete).heightIn(min = 52.dp),
+                    horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(UI.Trash, null, tint = C.danger, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Delete event", style = Ty.row, color = C.danger)
+                }
+            }
         }
     }
 

@@ -19,8 +19,8 @@ android {
         resValue("string", "app_name", "Unutma")
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

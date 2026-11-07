@@ -72,8 +72,10 @@ abstract class CalendarWidgetBase : AppWidgetProvider() {
     }
 }
 
-/** Today's date with a + button, and the next few events (with "TOMORROW" and day headings). */
+/** Today's date with a + button, and the next few events in the coming 30 days (with "TOMORROW" and day headings). */
 class CalAgendaWidget : CalendarWidgetBase() {
+    private companion object { const val DAYS_AHEAD = 30 }
+
     override fun build(ctx: Context, widgetId: Int): RemoteViews {
         val today = Routines.today()
         val now = System.currentTimeMillis()
@@ -91,10 +93,10 @@ class CalAgendaWidget : CalendarWidgetBase() {
                 setTextViewText(R.id.w_ca_empty, CONNECT)
                 return@apply
             }
-            val events = Cal.events(ctx, now, Routines.startOf(today + 7)).filter { it.end > now }
+            val events = Cal.events(ctx, now, Routines.startOf(today + DAYS_AHEAD)).filter { it.end > now }
             if (events.isEmpty()) {
                 setViewVisibility(R.id.w_ca_list, View.GONE); setViewVisibility(R.id.w_ca_empty, View.VISIBLE)
-                setTextViewText(R.id.w_ca_empty, "Nothing this week")
+                setTextViewText(R.id.w_ca_empty, "Nothing in the next $DAYS_AHEAD days")
                 return@apply
             }
             val heads = listOf(R.id.w_ca_head0, R.id.w_ca_head1, R.id.w_ca_head2, R.id.w_ca_head3, R.id.w_ca_head4)

@@ -7,7 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,8 +45,14 @@ fun BackupSection(unlock: (onSuccess: () -> Unit) -> Unit) {
 
     fun report(title: String, r: Backup.Result) {
         message = title to buildString {
-            append("${r.notes} note${if (r.notes == 1) "" else "s"} backed up.")
-            if (r.lockedLeftOut > 0) append(" ${r.lockedLeftOut} locked note${if (r.lockedLeftOut == 1) "" else "s"} couldn't be unlocked and were left out — try again.")
+            if (com.example.unutma.util.Lang.isPt) {
+                append("${r.notes} ${if (r.notes == 1) "nota guardada" else "notas guardadas"} na cópia.")
+                if (r.lockedLeftOut > 0) append(if (r.lockedLeftOut == 1) " 1 nota bloqueada não pôde ser desbloqueada e ficou de fora — tente novamente."
+                    else " ${r.lockedLeftOut} notas bloqueadas não puderam ser desbloqueadas e ficaram de fora — tente novamente.")
+            } else {
+                append("${r.notes} note${if (r.notes == 1) "" else "s"} backed up.")
+                if (r.lockedLeftOut > 0) append(" ${r.lockedLeftOut} locked note${if (r.lockedLeftOut == 1) "" else "s"} couldn't be unlocked and were left out — try again.")
+            }
         }
     }
 
@@ -93,7 +98,13 @@ fun BackupSection(unlock: (onSuccess: () -> Unit) -> Unit) {
             withContext(Dispatchers.Main) {
                 busy = null
                 message = r.fold(
-                    onSuccess = { "Restored" to "${it.notes} note${if (it.notes == 1) "" else "s"} added" + (if (it.labels > 0) ", ${it.labels} label${if (it.labels == 1) "" else "s"}" else "") + "." + (if (it.skipped > 0) " ${it.skipped} were already here." else "") + " Reminders and pins are set up again." },
+                    onSuccess = {
+                        if (com.example.unutma.util.Lang.isPt)
+                            "Restored" to "${it.notes} ${if (it.notes == 1) "nota adicionada" else "notas adicionadas"}" +
+                                (if (it.labels > 0) ", ${it.labels} ${if (it.labels == 1) "etiqueta" else "etiquetas"}" else "") + "." +
+                                (if (it.skipped > 0) " ${it.skipped} já existiam." else "") + " Os lembretes e as notas fixadas foram repostos."
+                        else "Restored" to "${it.notes} note${if (it.notes == 1) "" else "s"} added" + (if (it.labels > 0) ", ${it.labels} label${if (it.labels == 1) "" else "s"}" else "") + "." + (if (it.skipped > 0) " ${it.skipped} were already here." else "") + " Reminders and pins are set up again."
+                    },
                     onFailure = { "Couldn't restore" to (it.message ?: "That file couldn't be read.") },
                 )
             }

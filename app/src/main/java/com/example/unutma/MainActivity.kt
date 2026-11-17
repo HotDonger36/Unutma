@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
     fun unlock(onSuccess: () -> Unit) {
         val km = getSystemService(KeyguardManager::class.java)
         if (!km.isDeviceSecure) {
-            Toast.makeText(this, "Set a screen lock on your phone to protect locked notes.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, com.example.unutma.util.Lang.tr("Set a screen lock on your phone to protect locked notes."), Toast.LENGTH_LONG).show()
             onSuccess(); return
         }
         if (Build.VERSION.SDK_INT >= 30) {
@@ -178,7 +178,7 @@ fun UnutmaApp(settings: Settings, incoming: MutableState<Intent?>, unlock: (() -
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a note — or “shopping list eggs, milk and bread”")
         try { speech.launch(i) } catch (_: ActivityNotFoundException) {
-            Toast.makeText(ctx, "Speech recognition isn't available on this phone.", Toast.LENGTH_LONG).show()
+            Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Speech recognition isn't available on this phone."), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -188,7 +188,7 @@ fun UnutmaApp(settings: Settings, incoming: MutableState<Intent?>, unlock: (() -
             putExtra(Intent.EXTRA_SUBJECT, "Unutma – feedback")
         }
         try { ctx.startActivity(i) } catch (_: ActivityNotFoundException) {
-            Toast.makeText(ctx, "No email app found.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(ctx, com.example.unutma.util.Lang.tr("No email app found."), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -250,7 +250,7 @@ fun UnutmaApp(settings: Settings, incoming: MutableState<Intent?>, unlock: (() -
                 },
                 onSortCustom = {
                     Prefs.get(ctx).update { it.copy(sortOrder = com.example.unutma.data.SortOrder.CUSTOM) }
-                    Toast.makeText(ctx, "Sorted by your order now. Change it in Settings › Sort order.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Sorted by your order now. Change it in Settings › Sort order."), Toast.LENGTH_SHORT).show()
                 },
                 onLabels = { push(Route.Labels(create = labels.isEmpty())) },
                 onSettings = { push(Route.Settings) },
@@ -269,7 +269,7 @@ fun UnutmaApp(settings: Settings, incoming: MutableState<Intent?>, unlock: (() -
                             Repo.scope.launch {
                                 val ok = Repo.unlockNotes(ctx, chosen.map { it.id })
                                 if (!ok) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                    Toast.makeText(ctx, "Some notes couldn't be unlocked. Try again.", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Some notes couldn't be unlocked. Try again."), Toast.LENGTH_LONG).show()
                                 }
                             }
                         }

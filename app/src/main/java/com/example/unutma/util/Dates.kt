@@ -7,7 +7,7 @@ import java.util.Locale
 
 /** Dates are written the European way: 24-hour clock, day before month. */
 object Fmt {
-    private val loc = Locale.UK
+    private val loc: Locale get() = Lang.locale
     private const val DAY = 24L * 60 * 60 * 1000
 
     private fun f(p: String, ms: Long) = SimpleDateFormat(p, loc).format(Date(ms))

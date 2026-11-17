@@ -29,6 +29,7 @@
     </queries>
 
     <application
+        android:name=".UnutmaApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -152,6 +153,10 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_notes_info" />
         </receiver>
+        <service
+            android:name=".widget.CalAgendaService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
         <service
             android:name=".widget.NotesListService"
             android:exported="false"

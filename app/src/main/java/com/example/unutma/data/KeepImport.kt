@@ -142,7 +142,15 @@ object KeepImport {
     } catch (_: Exception) { 0L }
 
     /** "Imported 84 notes (12 checklists). 3 already here, 5 in Keep's trash skipped." */
-    fun summary(r: Result): String = buildString {
+    fun summary(r: Result): String = if (com.example.unutma.util.Lang.isPt) buildString {
+        append("Importadas ${r.notes} ${if (r.notes == 1) "nota" else "notas"}")
+        if (r.checklists > 0) append(" (${r.checklists} ${if (r.checklists == 1) "lista" else "listas"})")
+        append(".")
+        if (r.labels > 0) append(" ${r.labels} ${if (r.labels == 1) "nova etiqueta" else "novas etiquetas"}.")
+        if (r.alreadyHere > 0) append(" ${r.alreadyHere} já existiam, ignoradas.")
+        if (r.trashed > 0) append(" ${r.trashed} no lixo do Keep, ignoradas.")
+        if (r.unreadable > 0) append(" ${r.unreadable} não puderam ser lidas.")
+    } else buildString {
         append("Imported ${r.notes} note${if (r.notes == 1) "" else "s"}")
         if (r.checklists > 0) append(" (${r.checklists} checklist${if (r.checklists == 1) "" else "s"})")
         append(".")

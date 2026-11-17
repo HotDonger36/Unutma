@@ -150,15 +150,15 @@ open class DailyListWidget : NoteWidgetBase() {
             Triple(R.id.w_a_row2, R.id.w_a_box2, R.id.w_a_text2),
         )
         return RemoteViews(ctx.packageName, R.layout.widget_daily).apply {
-            setTextViewText(R.id.w_a_title, noteDisplayTitle(note))
+            text(R.id.w_a_title, noteDisplayTitle(note))
             setImageViewBitmap(R.id.w_a_ring, Widgets.ring(ctx, done, total, color, 14, 2f))
-            setTextViewText(R.id.w_a_count, "$done/$total")
+            text(R.id.w_a_count, "$done/$total")
             setInt(R.id.w_a_rule, "setBackgroundColor", color)
             setOnClickPendingIntent(R.id.w_a_root, CheckWidgets.open(ctx, 65_000 + widgetId, note.id))
             if (note.isLocked) {
                 setViewVisibility(R.id.w_a_locked, View.VISIBLE)
                 setViewVisibility(R.id.w_a_space, View.GONE)
-                setTextViewText(R.id.w_a_footer, "")
+                text(R.id.w_a_footer, "")
             } else {
                 // Up to three items around the first one still to do — fewer if the widget is short.
                 val fit = rowsThatFit(usedDp = 77, rowDp = 32, max = rows.size)
@@ -178,7 +178,7 @@ open class DailyListWidget : NoteWidgetBase() {
                     setContentDescription(row, (if (c.checked) "Done: " else "Not done: ") + CheckWidgets.itemText(c))
                     setOnClickPendingIntent(row, CheckWidgets.toggle(ctx, this@DailyListWidget.javaClass, widgetId, note.id, i))
                 }
-                setTextViewText(R.id.w_a_footer, CheckWidgets.resetText(note, done, total))
+                text(R.id.w_a_footer, CheckWidgets.resetText(note, done, total))
             }
             Widgets.scaleText(ctx, widgetId, this, R.id.w_a_title to 16f, R.id.w_a_count to 12f, R.id.w_a_text0 to 14f,
                 R.id.w_a_text1 to 14f, R.id.w_a_text2 to 14f, R.id.w_a_footer to 10f, R.id.w_a_locked to 12f)
@@ -208,29 +208,29 @@ class RingListWidget : NoteWidgetBase() {
                 setSpan(RelativeSizeSpan(0.75f), s, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 setSpan(ForegroundColorSpan(if (allDone) 0xFF2A2A2A.toInt() else Widgets.MUTED), s, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
-            setTextViewText(R.id.w_b_count, count)
+            text(R.id.w_b_count, count)
             if (allDone) setTextColor(R.id.w_b_count, 0xFF0A0A0A.toInt())
             setContentDescription(R.id.w_b_ring, "$done of $total done")
-            setTextViewText(R.id.w_b_label, (label?.name ?: "List").uppercase())
+            text(R.id.w_b_label, (label?.name ?: "List").uppercase())
             setTextColor(R.id.w_b_label, color)
-            setTextViewText(R.id.w_b_title, noteDisplayTitle(note))
+            text(R.id.w_b_title, noteDisplayTitle(note))
             setOnClickPendingIntent(R.id.w_b_root, CheckWidgets.open(ctx, 66_000 + widgetId, note.id))
 
             val next = checks.indexOfFirst { !it.checked }
             when {
                 note.isLocked -> {
                     setViewVisibility(R.id.w_b_box, View.GONE)
-                    setTextViewText(R.id.w_b_next, "Locked")
+                    text(R.id.w_b_next, "Locked")
                 }
                 next >= 0 -> {
                     setImageViewBitmap(R.id.w_b_box, CheckWidgets.box(ctx, false, color, 14))
-                    setTextViewText(R.id.w_b_next, CheckWidgets.itemText(checks[next]))
+                    text(R.id.w_b_next, CheckWidgets.itemText(checks[next]))
                     setContentDescription(R.id.w_b_next_row, "Tick " + CheckWidgets.itemText(checks[next]))
                     setOnClickPendingIntent(R.id.w_b_next_row, CheckWidgets.toggle(ctx, this@RingListWidget.javaClass, widgetId, note.id, next))
                 }
                 else -> {
                     setImageViewBitmap(R.id.w_b_box, CheckWidgets.box(ctx, true, color, 14))
-                    setTextViewText(R.id.w_b_next, "All done")
+                    text(R.id.w_b_next, "All done")
                     setTextColor(R.id.w_b_next, color)
                 }
             }
@@ -255,8 +255,8 @@ class NextUpWidget : NoteWidgetBase() {
         val done = checks.count { it.checked }
         val total = checks.size
         return RemoteViews(ctx.packageName, R.layout.widget_segments).apply {
-            setTextViewText(R.id.w_c_title, noteDisplayTitle(note))
-            setTextViewText(R.id.w_c_count, "$done/$total")
+            text(R.id.w_c_title, noteDisplayTitle(note))
+            text(R.id.w_c_count, "$done/$total")
             setTextColor(R.id.w_c_count, color)
             setTextColor(R.id.w_c_hint, color)
             setOnClickPendingIntent(R.id.w_c_root, CheckWidgets.open(ctx, 67_000 + widgetId, note.id))
@@ -274,21 +274,21 @@ class NextUpWidget : NoteWidgetBase() {
             val next = checks.indexOfFirst { !it.checked }
             when {
                 note.isLocked -> {
-                    setTextViewText(R.id.w_c_hint, "LOCKED")
+                    text(R.id.w_c_hint, "LOCKED")
                     setViewVisibility(R.id.w_c_box, View.GONE)
-                    setTextViewText(R.id.w_c_next, "Open to see it")
+                    text(R.id.w_c_next, "Open to see it")
                     setOnClickPendingIntent(R.id.w_c_card, CheckWidgets.open(ctx, 67_500 + widgetId, note.id))
                 }
                 next >= 0 -> {
                     setImageViewBitmap(R.id.w_c_box, CheckWidgets.box(ctx, false, color))
-                    setTextViewText(R.id.w_c_next, CheckWidgets.itemText(checks[next]))
+                    text(R.id.w_c_next, CheckWidgets.itemText(checks[next]))
                     setContentDescription(R.id.w_c_card, "Tick " + CheckWidgets.itemText(checks[next]))
                     setOnClickPendingIntent(R.id.w_c_card, CheckWidgets.toggle(ctx, this@NextUpWidget.javaClass, widgetId, note.id, next))
                 }
                 else -> {
-                    setTextViewText(R.id.w_c_hint, CheckWidgets.resetText(note, done, total))
+                    text(R.id.w_c_hint, CheckWidgets.resetText(note, done, total))
                     setImageViewBitmap(R.id.w_c_box, CheckWidgets.box(ctx, true, color))
-                    setTextViewText(R.id.w_c_next, "All done")
+                    text(R.id.w_c_next, "All done")
                     setOnClickPendingIntent(R.id.w_c_card, CheckWidgets.open(ctx, 67_500 + widgetId, note.id))
                 }
             }
@@ -319,13 +319,13 @@ class StreakWidget : NoteWidgetBase() {
         val dayIds = listOf(R.id.w_d_day0, R.id.w_d_day1, R.id.w_d_day2, R.id.w_d_day3, R.id.w_d_day4, R.id.w_d_day5, R.id.w_d_day6)
         val letterIds = listOf(R.id.w_d_letter0, R.id.w_d_letter1, R.id.w_d_letter2, R.id.w_d_letter3, R.id.w_d_letter4, R.id.w_d_letter5, R.id.w_d_letter6)
         return RemoteViews(ctx.packageName, R.layout.widget_streak).apply {
-            setTextViewText(R.id.w_d_title, noteDisplayTitle(note))
-            setTextViewText(R.id.w_d_count, "$done/$total today")
+            text(R.id.w_d_title, noteDisplayTitle(note))
+            text(R.id.w_d_count, "$done/$total today")
             setTextColor(R.id.w_d_count, color)
-            setTextViewText(R.id.w_d_streak, streak.toString())
+            text(R.id.w_d_streak, streak.toString())
             setTextColor(R.id.w_d_streak, color)
             val unit = if (weekly) "week" else "day"
-            setTextViewText(R.id.w_d_streak_unit, if (streak == 1) "$unit streak" else "${unit}s streak")
+            text(R.id.w_d_streak_unit, if (streak == 1) "$unit streak" else "${unit}s streak")
             setOnClickPendingIntent(R.id.w_d_root, CheckWidgets.open(ctx, 68_000 + widgetId, note.id))
 
             // This week, Monday first.
@@ -335,7 +335,7 @@ class StreakWidget : NoteWidgetBase() {
             }
 
             val next = checks.firstOrNull { !it.checked }
-            setTextViewText(R.id.w_d_next, when {
+            text(R.id.w_d_next, when {
                 note.isLocked -> "Locked"
                 next != null -> SpannableStringBuilder("Next: ").apply {
                     val s = length

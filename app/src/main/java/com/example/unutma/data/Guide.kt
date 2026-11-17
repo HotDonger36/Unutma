@@ -70,7 +70,7 @@ object Guide {
                     • Tap **+** to write a note. Long-press **+** for a checklist, or to talk and have it written for you.
                     • Notes save themselves as you type. There's no Save button.
                     • Made a mistake? Use undo and redo at the top of a note.
-                    • Tap a note to open it. Long-press a note to select several.
+                    • Tap a note to open it. Hold a note to select it; then tap others to select several.
                     • The bar at the bottom switches between Notes, Routines (checklists that come back, with streaks) and Calendar (your Google Calendar). In Calendar, swipe the days left or right for other weeks, or tap the month to jump to a date.
 
                     Start with [[Checklists]] and [[Reminders and dates]]. Everything else — labels, routines, writing tricks, pictures, locking notes, backups, the calendar and widgets — is in ⋯ › Settings › Help.
@@ -104,9 +104,9 @@ object Guide {
 
                     • Give a note a label with the chip above its title.
                     • Create, rename and recolour labels in ⋯ › Manage labels, and drag them into the order you like.
-                    • Hold a note until it buzzes, then drag it to put the notes in your own order (pinned notes stay above the others).
+                    • To put notes in your own order, hold a note to start selecting, then drag the dots on the right of a note (pinned notes stay above the others).
                     • Tap a section's title on the notes screen to fold it away; tap again to open it.
-                    • Select several notes (long-press) to label, pin, lock, archive or delete them together. The select-all button picks every note on screen.
+                    • Select several notes (hold one, then tap the others) to label, pin, lock, archive or delete them together. The select-all button picks every note on screen.
 
                     This note is in the **Guide** label. Next: [[Reminders and dates]].
                 """),
@@ -201,7 +201,7 @@ object Guide {
                     • **Agenda** (your events for the next 30 days), **Next event** and **This week** — your calendar on the home screen; they update when your events change.
                     • **Notes** — several notes at once, with a + for a new one.
 
-                    Widgets can be resized: long-press one and drag its edges. Long-press › Widget settings changes its text size (and which note, or which label, it shows).
+                    The Agenda widget scrolls, so you can reach every event in the next 30 days. Widgets can be resized: long-press one and drag its edges. Long-press › Widget settings changes its text size (and which note, or which label, it shows).
 
                     In ⋯ › Settings you can change the theme, accent colour, text size, default widget text size, sort order and how long deleted notes are kept, set notification sound and vibration, back up, restore, import from Google Keep, read Help and send feedback.
 

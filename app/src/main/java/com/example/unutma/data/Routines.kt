@@ -75,7 +75,17 @@ object Routines {
         else -> "Off"
     }
 
-    val DAY_NAMES = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    private val DAYS_EN = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    private val DAYS_PT = listOf("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom")
+    val DAY_NAMES: List<String> get() = if (com.example.unutma.util.Lang.isPt) DAYS_PT else DAYS_EN
+
+    /** One letter for a weekday square (1 = Monday). */
+    fun dayLetter(day: Int): String =
+        if (com.example.unutma.util.Lang.isPt) listOf("S", "T", "Q", "Q", "S", "S", "D")[day - 1] else DAYS_EN[day - 1].take(1)
+
+    /** Two characters for the weekday picker (1 = Monday). */
+    fun dayShort2(day: Int): String =
+        if (com.example.unutma.util.Lang.isPt) listOf("2ª", "3ª", "4ª", "5ª", "6ª", "Sá", "Do")[day - 1] else DAYS_EN[day - 1].take(2)
 
     /** When the current period began (the boxes were last unticked), as epoch ms. */
     fun periodStart(mode: String, now: Long): Long {

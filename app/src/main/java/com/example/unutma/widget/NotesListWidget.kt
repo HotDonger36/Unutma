@@ -117,9 +117,9 @@ class NotesListService : RemoteViewsService() {
         override fun getViewAt(position: Int): RemoteViews {
             val n = notes.getOrNull(position) ?: return RemoteViews(ctx.packageName, R.layout.widget_notes_item)
             return RemoteViews(ctx.packageName, R.layout.widget_notes_item).apply {
-                setTextViewText(R.id.w_ni_title, noteDisplayTitle(n))
+                text(R.id.w_ni_title, noteDisplayTitle(n))
                 val body = NotesListWidget.preview(n)
-                setTextViewText(R.id.w_ni_body, body)
+                text(R.id.w_ni_body, body)
                 setViewVisibility(R.id.w_ni_body, if (body.isEmpty()) View.GONE else View.VISIBLE)
                 val c = n.labelId?.let { colors[it] }
                 if (c != null) {

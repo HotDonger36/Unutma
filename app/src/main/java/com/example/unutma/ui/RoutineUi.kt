@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -128,7 +127,7 @@ fun WeekStrip(
             ) {
                 DaySquareBox(sq, color, square)
                 Text(
-                    Routines.DAY_NAMES[Routines.weekday(sq.day) - 1].take(1),
+                    Routines.dayLetter(Routines.weekday(sq.day)),
                     style = Ty.mono.copy(fontSize = 9.sp),
                     color = if (sq.isToday) C.fg else C.faint,
                 )
@@ -422,7 +421,7 @@ fun RoutineDialog(mode: String, onPick: (String) -> Unit, onDismiss: () -> Unit)
                         .clickable(role = Role.Checkbox) { days = if (on) days - d else days + d }
                         .semantics { contentDescription = Routines.DAY_NAMES[d - 1] + if (on) ", on" else ", off" },
                     contentAlignment = Alignment.Center,
-                ) { Text(Routines.DAY_NAMES[d - 1].take(2), style = Ty.mono, color = if (on) C.bg else C.muted) }
+                ) { Text(Routines.dayShort2(d), style = Ty.mono, color = if (on) C.bg else C.muted) }
             }
         }
         if (kind == "EVERY") Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {

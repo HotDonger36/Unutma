@@ -1,9 +1,13 @@
 package com.example.unutma.ui
 
+import android.app.Activity
 import android.content.Intent
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings as AndroidSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,7 +16,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.example.unutma.data.AppLanguage
 import com.example.unutma.data.ARCHIVE_FOREVER
 import com.example.unutma.data.ARCHIVE_OPTIONS
 import com.example.unutma.data.Guide
@@ -46,10 +50,19 @@ fun SettingsScreen(
     unlock: (onSuccess: () -> Unit) -> Unit,
 ) {
     val ctx = LocalContext.current
+    val soundPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        @Suppress("DEPRECATION")
+        val picked = r.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        val default = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        onChange { it.copy(soundUri = if (picked == null || picked == default) "" else picked.toString()) }
+        Notifier.reminderChannel(ctx)
+    }
     var sortDialog by remember { mutableStateOf(false) }
     var archiveDialog by remember { mutableStateOf(false) }
     var sizeDialog by remember { mutableStateOf(false) }
     var widgetSizeDialog by remember { mutableStateOf(false) }
+    var languageDialog by remember { mutableStateOf(false) }
     val version = remember {
         try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "1.0" } catch (_: Exception) { "1.0" }
     }
@@ -76,6 +89,7 @@ fun SettingsScreen(
                 }
                 HDivider()
                 ValueRow("Text size", settings.textSize.label) { sizeDialog = true }
+                ValueRow("Language", settings.language.label) { languageDialog = true }
             }
 
             SettingsSection("Notes") {
@@ -89,6 +103,20 @@ fun SettingsScreen(
 
             SettingsSection("Notifications") {
                 SwitchRow("Sound", settings.sound) { v -> onChange { it.copy(sound = v) }; Notifier.reminderChannel(ctx) }
+                if (settings.sound) {
+                    ValueRow("Reminder sound", soundName(ctx, settings.soundUri)) {
+                        val i = Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+                            .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION or RingtoneManager.TYPE_ALARM)
+                            .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Reminder sound")
+                            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                        settings.soundUri.takeIf { it.isNotBlank() }?.let { i.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(it)) }
+                        soundPicker.launch(i)
+                    }
+                    SwitchRow("Play as an alarm (loud, even on silent)", settings.soundAlarm) { v ->
+                        onChange { it.copy(soundAlarm = v) }; Notifier.reminderChannel(ctx)
+                    }
+                }
                 SwitchRow("Vibration", settings.vibration) { v -> onChange { it.copy(vibration = v) }; Notifier.reminderChannel(ctx) }
                 SwitchRow("Show pinned notes opened", settings.pinExpanded) { v ->
                     onChange { it.copy(pinExpanded = v) }
@@ -110,7 +138,7 @@ fun SettingsScreen(
                     Repo.scope.launch {
                         Guide.add(ctx.applicationContext)
                         withContext(Dispatchers.Main) {
-                            android.widget.Toast.makeText(ctx, "Guide notes added to the Guide label", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Guide notes added to the Guide label"), android.widget.Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -140,8 +168,25 @@ fun SettingsScreen(
         { v -> onChange { it.copy(archiveDays = v) } }, { archiveDialog = false })
     if (sizeDialog) OptionDialog("Text size", TextSize.entries.map { it to it.label }, settings.textSize,
         { v -> onChange { it.copy(textSize = v) } }, { sizeDialog = false })
+    if (languageDialog) OptionDialog("Language", AppLanguage.entries.map { it to it.label }, settings.language,
+        { v ->
+            if (v != settings.language) {
+                onChange { it.copy(language = v) }
+                // Widgets and pinned notes are redrawn in the new language, and the screens are rebuilt.
+                com.example.unutma.widget.Widgets.refreshAll(ctx)
+                Repo.scope.launch { Notifier.resyncPins(ctx.applicationContext) }
+                var c: android.content.Context = ctx
+                while (c is android.content.ContextWrapper) { if (c is Activity) { c.recreate(); break }; c = c.baseContext }
+            }
+        }, { languageDialog = false })
     if (widgetSizeDialog) OptionDialog("Widget text size", TextSize.entries.map { it to it.label }, settings.widgetTextSize,
         { v -> onChange { it.copy(widgetTextSize = v) }; com.example.unutma.widget.Widgets.refreshAll(ctx) }, { widgetSizeDialog = false })
+}
+
+/** The name of the chosen reminder sound ("Default" when you haven't picked one). */
+private fun soundName(ctx: android.content.Context, uri: String): String {
+    if (uri.isBlank()) return "Default"
+    return try { RingtoneManager.getRingtone(ctx, Uri.parse(uri))?.getTitle(ctx) ?: "Custom" } catch (_: Exception) { "Custom" }
 }
 
 @Composable

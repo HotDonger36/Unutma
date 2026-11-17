@@ -1,15 +1,20 @@
 package com.example.unutma.widget
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
 import android.widget.RemoteViews
+import android.widget.RemoteViewsService
 import com.example.unutma.MainActivity
 import com.example.unutma.R
 import com.example.unutma.data.Cal
@@ -39,8 +44,10 @@ abstract class CalendarWidgetBase : AppWidgetProvider() {
     override fun onAppWidgetOptionsChanged(context: Context, mgr: AppWidgetManager, id: Int, newOptions: android.os.Bundle) =
         onUpdate(context, mgr, intArrayOf(id))
 
+    open fun afterRender(ctx: Context, mgr: AppWidgetManager, id: Int) {}
+
     fun renderAll(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
-        for (id in ids) try { mgr.updateAppWidget(id, build(ctx, id)) } catch (_: Exception) {}
+        for (id in ids) try { mgr.updateAppWidget(id, build(ctx, id)); afterRender(ctx, mgr, id) } catch (_: Exception) {}
     }
 
     companion object {
@@ -72,52 +79,90 @@ abstract class CalendarWidgetBase : AppWidgetProvider() {
     }
 }
 
-/** Today's date with a + button, and the next few events in the coming 30 days (with "TOMORROW" and day headings). */
+/** Today's date with a + button, and a scrolling list of every event in the coming 30 days (with day and month headings). */
 class CalAgendaWidget : CalendarWidgetBase() {
-    private companion object { const val DAYS_AHEAD = 30 }
+    companion object {
+        const val DAYS_AHEAD = 30
+
+        /** "TOMORROW", or "WED 18 NOV" so the month is always there. */
+        fun dayHeading(day: Long, today: Long): String =
+            if (day == today + 1) "TOMORROW"
+            else SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date(Routines.startOf(day))).uppercase()
+    }
 
     override fun build(ctx: Context, widgetId: Int): RemoteViews {
         val today = Routines.today()
-        val now = System.currentTimeMillis()
         val ms = Routines.startOf(today)
         val accent = Widgets.accent(ctx)
         return RemoteViews(ctx.packageName, R.layout.widget_cal_agenda).apply {
-            setTextViewText(R.id.w_ca_dow, SimpleDateFormat("EEE", Locale.getDefault()).format(Date(ms)).uppercase())
+            text(R.id.w_ca_dow, SimpleDateFormat("EEE", Locale.getDefault()).format(Date(ms)).uppercase())
             setTextColor(R.id.w_ca_dow, accent)
-            setTextViewText(R.id.w_ca_day, SimpleDateFormat("d", Locale.getDefault()).format(Date(ms)))
-            setTextViewText(R.id.w_ca_month, SimpleDateFormat("MMM", Locale.getDefault()).format(Date(ms)).uppercase())
+            text(R.id.w_ca_day, SimpleDateFormat("d", Locale.getDefault()).format(Date(ms)))
+            text(R.id.w_ca_month, SimpleDateFormat("MMM", Locale.getDefault()).format(Date(ms)).uppercase())
             setOnClickPendingIntent(R.id.w_ca_root, openCalendar(ctx, 80_000 + widgetId))
             setOnClickPendingIntent(R.id.w_ca_new, newEvent(ctx, 81_000 + widgetId))
-            if (!Cal.canRead(ctx)) {
-                setViewVisibility(R.id.w_ca_list, View.GONE); setViewVisibility(R.id.w_ca_empty, View.VISIBLE)
-                setTextViewText(R.id.w_ca_empty, CONNECT)
-                return@apply
+            text(R.id.w_ca_empty,
+                if (Cal.canRead(ctx)) "Nothing in the next $DAYS_AHEAD days" else CONNECT)
+            val svc = Intent(ctx, CalAgendaService::class.java).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                data = Uri.parse("unutma://cal-agenda/$widgetId")
             }
-            val events = Cal.events(ctx, now, Routines.startOf(today + DAYS_AHEAD)).filter { it.end > now }
-            if (events.isEmpty()) {
-                setViewVisibility(R.id.w_ca_list, View.GONE); setViewVisibility(R.id.w_ca_empty, View.VISIBLE)
-                setTextViewText(R.id.w_ca_empty, "Nothing in the next $DAYS_AHEAD days")
-                return@apply
+            @Suppress("DEPRECATION")
+            setRemoteAdapter(R.id.w_ca_list, svc)
+            setEmptyView(R.id.w_ca_list, R.id.w_ca_empty)
+            // Tapping an event opens the calendar, the same as tapping anywhere else on the widget.
+            val open = Intent(ctx, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_OPEN_CALENDAR
+                data = Uri.parse("unutma://cal-agenda-open/$widgetId")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
-            val heads = listOf(R.id.w_ca_head0, R.id.w_ca_head1, R.id.w_ca_head2, R.id.w_ca_head3, R.id.w_ca_head4)
-            val rows = listOf(R.id.w_ca_row0, R.id.w_ca_row1, R.id.w_ca_row2, R.id.w_ca_row3, R.id.w_ca_row4)
-            val times = listOf(R.id.w_ca_time0, R.id.w_ca_time1, R.id.w_ca_time2, R.id.w_ca_time3, R.id.w_ca_time4)
-            val dots = listOf(R.id.w_ca_dot0, R.id.w_ca_dot1, R.id.w_ca_dot2, R.id.w_ca_dot3, R.id.w_ca_dot4)
-            val titles = listOf(R.id.w_ca_title0, R.id.w_ca_title1, R.id.w_ca_title2, R.id.w_ca_title3, R.id.w_ca_title4)
-            var lastDay = today
-            for ((i, e) in events.take(5).withIndex()) {
-                val day = Routines.dayOf(e.begin).coerceAtLeast(today)
-                if (day != lastDay) {
-                    setViewVisibility(heads[i], View.VISIBLE)
-                    setTextViewText(heads[i], if (day == today + 1) "TOMORROW"
-                    else SimpleDateFormat("EEE d", Locale.getDefault()).format(Date(Routines.startOf(day))).uppercase())
-                    lastDay = day
-                }
-                setViewVisibility(rows[i], View.VISIBLE)
-                setTextViewText(times[i], if (e.allDay) "all day" else Fmt.time(e.begin))
-                if (day == today && (Cal.soonText(e) != null)) setTextColor(times[i], color(e))
-                setImageViewBitmap(dots[i], ring(ctx, color(e)))
-                setTextViewText(titles[i], e.title)
+            val mutable = if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
+            setPendingIntentTemplate(R.id.w_ca_list,
+                PendingIntent.getActivity(ctx, 84_000 + widgetId, open, PendingIntent.FLAG_UPDATE_CURRENT or mutable))
+        }
+    }
+
+    override fun afterRender(ctx: Context, mgr: AppWidgetManager, id: Int) =
+        mgr.notifyAppWidgetViewDataChanged(id, R.id.w_ca_list)
+}
+
+/** The scrolling event rows for [CalAgendaWidget]. */
+class CalAgendaService : RemoteViewsService() {
+    override fun onGetViewFactory(intent: Intent): RemoteViewsFactory = Factory(applicationContext)
+
+    private class Factory(val ctx: Context) : RemoteViewsFactory {
+        private var events: List<CalEvent> = emptyList()
+        private var today = Routines.today()
+
+        override fun onCreate() {}
+        override fun onDestroy() {}
+        override fun getCount() = events.size
+        override fun getViewTypeCount() = 1
+        override fun hasStableIds() = false
+        override fun getItemId(position: Int) = position.toLong()
+        override fun getLoadingView(): RemoteViews? = null
+
+        override fun onDataSetChanged() {
+            today = Routines.today()
+            val now = System.currentTimeMillis()
+            events = if (!Cal.canRead(ctx)) emptyList()
+            else Cal.events(ctx, now, Routines.startOf(today + CalAgendaWidget.DAYS_AHEAD)).filter { it.end > now }
+        }
+
+        override fun getViewAt(position: Int): RemoteViews {
+            val e = events.getOrNull(position) ?: return RemoteViews(ctx.packageName, R.layout.widget_cal_agenda_item)
+            val day = Routines.dayOf(e.begin).coerceAtLeast(today)
+            val prev = events.getOrNull(position - 1)?.let { Routines.dayOf(it.begin).coerceAtLeast(today) } ?: today
+            return RemoteViews(ctx.packageName, R.layout.widget_cal_agenda_item).apply {
+                if (day != prev) {
+                    setViewVisibility(R.id.w_cai_head, View.VISIBLE)
+                    text(R.id.w_cai_head, CalAgendaWidget.dayHeading(day, today))
+                } else setViewVisibility(R.id.w_cai_head, View.GONE)
+                text(R.id.w_cai_time, if (e.allDay) "all day" else Fmt.time(e.begin))
+                if (day == today && Cal.soonText(e) != null) setTextColor(R.id.w_cai_time, CalendarWidgetBase.color(e))
+                setImageViewBitmap(R.id.w_cai_dot, CalendarWidgetBase.ring(ctx, CalendarWidgetBase.color(e)))
+                text(R.id.w_cai_title, e.title)
+                setOnClickFillInIntent(R.id.w_cai_root, Intent())
             }
         }
     }
@@ -130,13 +175,13 @@ class CalNextWidget : CalendarWidgetBase() {
         return RemoteViews(ctx.packageName, R.layout.widget_cal_next).apply {
             setOnClickPendingIntent(R.id.w_cn_root, openCalendar(ctx, 82_000 + widgetId))
             if (!Cal.canRead(ctx)) {
-                setTextViewText(R.id.w_cn_title, "Connect your calendar"); setTextViewText(R.id.w_cn_time, "in Unutma › Calendar")
+                text(R.id.w_cn_title, "Connect your calendar"); text(R.id.w_cn_time, "in Unutma › Calendar")
                 return@apply
             }
             val e = Cal.events(ctx, now, now + 60L * 24 * 60 * 60 * 1000).firstOrNull { !it.allDay && it.begin > now }
                 ?: Cal.events(ctx, now, now + 60L * 24 * 60 * 60 * 1000).firstOrNull { it.end > now }
             if (e == null) {
-                setTextViewText(R.id.w_cn_title, "Nothing coming up"); return@apply
+                text(R.id.w_cn_title, "Nothing coming up"); return@apply
             }
             val diff = e.begin - now
             val (n, unit) = when {
@@ -146,17 +191,17 @@ class CalNextWidget : CalendarWidgetBase() {
                 else -> "${diff / (24 * 3_600_000)}" to "days"
             }
             val c = color(e)
-            setTextViewText(R.id.w_cn_number, n); setTextColor(R.id.w_cn_number, c)
-            setTextViewText(R.id.w_cn_unit, unit); setTextColor(R.id.w_cn_unit, c)
-            setTextViewText(R.id.w_cn_title, e.title)
+            text(R.id.w_cn_number, n); setTextColor(R.id.w_cn_number, c)
+            text(R.id.w_cn_unit, unit); setTextColor(R.id.w_cn_unit, c)
+            text(R.id.w_cn_title, e.title)
             val day = Routines.dayOf(e.begin)
             val today = Routines.today()
             val dayText = when (day) {
                 today -> ""
                 today + 1 -> "Tomorrow "
-                else -> SimpleDateFormat("EEE d ", Locale.getDefault()).format(Date(e.begin))
+                else -> SimpleDateFormat("EEE d MMM ", Locale.getDefault()).format(Date(e.begin))
             }
-            setTextViewText(R.id.w_cn_time, dayText + Cal.timeText(e))
+            text(R.id.w_cn_time, dayText + Cal.timeText(e))
         }
     }
 }
@@ -171,11 +216,11 @@ class CalWeekWidget : CalendarWidgetBase() {
             setOnClickPendingIntent(R.id.w_cw_root, openCalendar(ctx, 83_000 + widgetId))
             if (!Cal.canRead(ctx)) {
                 setViewVisibility(R.id.w_cw_days, View.GONE); setViewVisibility(R.id.w_cw_empty, View.VISIBLE)
-                setTextViewText(R.id.w_cw_empty, CONNECT)
+                text(R.id.w_cw_empty, CONNECT)
                 return@apply
             }
             val perDay = Cal.events(ctx, Routines.startOf(monday), Routines.startOf(monday + 7)).groupingBy { Routines.dayOf(it.begin) }.eachCount()
-            setTextViewText(R.id.w_cw_count, perDay.values.sum().toString())
+            text(R.id.w_cw_count, perDay.values.sum().toString())
             val bars = listOf(R.id.w_cw_bar0, R.id.w_cw_bar1, R.id.w_cw_bar2, R.id.w_cw_bar3, R.id.w_cw_bar4, R.id.w_cw_bar5, R.id.w_cw_bar6)
             val letters = listOf(R.id.w_cw_letter0, R.id.w_cw_letter1, R.id.w_cw_letter2, R.id.w_cw_letter3, R.id.w_cw_letter4, R.id.w_cw_letter5, R.id.w_cw_letter6)
             for (i in 0..6) {

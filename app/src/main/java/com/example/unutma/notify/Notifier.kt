@@ -22,6 +22,8 @@ import com.example.unutma.MainActivity
 import com.example.unutma.Note
 import com.example.unutma.R
 import com.example.unutma.data.CheckBlock
+import com.example.unutma.util.Lang
+import com.example.unutma.widget.text
 import com.example.unutma.data.Prefs
 import com.example.unutma.data.Repo
 import com.example.unutma.data.TextBlock
@@ -56,13 +58,24 @@ object Notifier {
      */
     fun reminderChannel(ctx: Context): String {
         val s = Prefs.get(ctx).current
-        val id = "reminders_s${if (s.sound) 1 else 0}_v${if (s.vibration) 1 else 0}"
+        val id = "reminders_s${if (s.sound) 1 else 0}_v${if (s.vibration) 1 else 0}" +
+            "_a${if (s.soundAlarm) 1 else 0}_u${s.soundUri.hashCode().toUInt().toString(16)}"
         if (Build.VERSION.SDK_INT >= 26) {
             val m = nm(ctx)
             if (m.getNotificationChannel(id) == null) {
                 val ch = NotificationChannel(id, "Reminders", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Reminders you set on notes"
                     if (!s.sound) setSound(null, null)
+                    else {
+                        // The sound you picked in Settings (or the phone's default), optionally played as an alarm
+                        // so it is loud even when the phone is on silent.
+                        val uri = s.soundUri.takeIf { it.isNotBlank() }?.let { Uri.parse(it) }
+                            ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+                        val usage = if (s.soundAlarm) android.media.AudioAttributes.USAGE_ALARM
+                        else android.media.AudioAttributes.USAGE_NOTIFICATION
+                        setSound(uri, android.media.AudioAttributes.Builder().setUsage(usage)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                    }
                     enableVibration(s.vibration)
                     if (s.vibration) vibrationPattern = longArrayOf(0, 250, 120, 250)
                 }
@@ -131,20 +144,22 @@ object Notifier {
         }
         val b = NotificationCompat.Builder(ctx, reminderChannel(ctx))
             .setSmallIcon(R.drawable.ic_stat_logo)
-            .setContentTitle(title)
-            .setContentText(text)
+            .setContentTitle(Lang.tr(title))
+            .setContentText(Lang.tr(text))
             .setStyle(NotificationCompat.BigTextStyle().bigText(if (note.isLocked) text else blocks.plainText().ifBlank { text }))
             .setColor(labelColorInt(ctx, note, labelKey))
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(openNoteIntent(ctx, note.id, 1))
-            .addAction(0, "Done", broadcast(ctx, AlarmReceiver::class.java, AlarmReceiver.ACTION_DONE, note.id, 2))
-            .addAction(0, "Snooze 10 min", broadcast(ctx, AlarmReceiver::class.java, AlarmReceiver.ACTION_SNOOZE, note.id, 3))
+            .addAction(0, Lang.tr("Done"), broadcast(ctx, AlarmReceiver::class.java, AlarmReceiver.ACTION_DONE, note.id, 2))
+            .addAction(0, Lang.tr("Snooze 10 min"), broadcast(ctx, AlarmReceiver::class.java, AlarmReceiver.ACTION_SNOOZE, note.id, 3))
         if (Build.VERSION.SDK_INT < 26) {
             val s = Prefs.get(ctx).current
             var defaults = 0
-            if (s.sound) defaults = defaults or NotificationCompat.DEFAULT_SOUND
+            if (s.sound) {
+                if (s.soundUri.isNotBlank()) b.setSound(Uri.parse(s.soundUri)) else defaults = defaults or NotificationCompat.DEFAULT_SOUND
+            }
             if (s.vibration) defaults = defaults or NotificationCompat.DEFAULT_VIBRATE
             b.setDefaults(defaults)
         }
@@ -202,23 +217,26 @@ object Notifier {
         val color = labelColorInt(ctx, note, labelKey)
         // Same numbering as Repo.toggleCheck: checkboxes that have text.
         val checks = blocks.filterIsInstance<CheckBlock>().filter { it.text.isNotBlank() }
+        // Everything ticked: the note leaves the notification bar. It is still pinned, so when a daily/weekly
+        // checklist resets (or an item is unticked) it comes back.
+        if (!note.isLocked && checks.isNotEmpty() && checks.all { it.checked }) { cancelPin(ctx, note.id); return }
         val text = blocks.filterIsInstance<TextBlock>().flatMap { it.text.lines() }
             .map { stripMarkdown(it).trim() }.filter { it.isNotEmpty() }.joinToString("\n")
 
         val small = RemoteViews(ctx.packageName, R.layout.notif_pin_small)
         val big = RemoteViews(ctx.packageName, R.layout.notif_pin_big)
-        for (v in listOf(small, big)) v.setTextViewText(R.id.pin_title, title)
+        for (v in listOf(small, big)) v.text(R.id.pin_title, title)
         var summary: String
 
         if (note.isLocked) {
             summary = "Locked note"
-            small.setViewVisibility(R.id.pin_line, View.VISIBLE); small.setTextViewText(R.id.pin_line, summary)
-            big.setViewVisibility(R.id.pin_body, View.VISIBLE); big.setTextViewText(R.id.pin_body, "Locked note. Open Unutma to see it.")
+            small.setViewVisibility(R.id.pin_line, View.VISIBLE); small.text(R.id.pin_line, summary)
+            big.setViewVisibility(R.id.pin_body, View.VISIBLE); big.text(R.id.pin_body, "Locked note. Open Unutma to see it.")
         } else if (checks.isNotEmpty()) {
             val done = checks.count { it.checked }
             for (v in listOf(small, big)) {
                 v.setViewVisibility(R.id.pin_count, View.VISIBLE)
-                v.setTextViewText(R.id.pin_count, "$done/${checks.size}")
+                v.text(R.id.pin_count, "$done/${checks.size}")
                 v.setTextColor(R.id.pin_count, color)
             }
             // Collapsed: the next item to tick, or (all ticked) the items struck through.
@@ -229,13 +247,13 @@ object Notifier {
             } else {
                 summary = checks.joinToString(" · ") { itemText(it) }
                 small.setViewVisibility(R.id.pin_line, View.VISIBLE)
-                small.setTextViewText(R.id.pin_line, struck(summary))
+                small.text(R.id.pin_line, struck(summary))
                 small.setTextColor(R.id.pin_line, DONE_GREY)
             }
             // Expanded: any text (two lines), then the items.
             if (text.isNotEmpty()) {
                 big.setViewVisibility(R.id.pin_body, View.VISIBLE)
-                big.setTextViewText(R.id.pin_body, text)
+                big.text(R.id.pin_body, text)
                 big.setInt(R.id.pin_body, "setMaxLines", 2)
             }
             val rows = listOf(
@@ -249,19 +267,19 @@ object Notifier {
             }
             if (checks.size > PIN_ROWS) {
                 big.setViewVisibility(R.id.pin_more, View.VISIBLE)
-                big.setTextViewText(R.id.pin_more, "+${checks.size - PIN_ROWS} more · tap to open")
+                big.text(R.id.pin_more, "+${checks.size - PIN_ROWS} more · tap to open")
             }
         } else {
             summary = text.lineSequence().firstOrNull().orEmpty().ifEmpty { blocks.previewLine() }
-            small.setViewVisibility(R.id.pin_line, View.VISIBLE); small.setTextViewText(R.id.pin_line, summary)
-            big.setViewVisibility(R.id.pin_body, View.VISIBLE); big.setTextViewText(R.id.pin_body, text.ifEmpty { summary })
+            small.setViewVisibility(R.id.pin_line, View.VISIBLE); small.text(R.id.pin_line, summary)
+            big.setViewVisibility(R.id.pin_body, View.VISIBLE); big.text(R.id.pin_body, text.ifEmpty { summary })
         }
 
         val top = Prefs.get(ctx).current.pinExpanded
         val b = NotificationCompat.Builder(ctx, pinChannel(ctx))
             .setSmallIcon(R.drawable.ic_stat_logo)
-            .setContentTitle(title)
-            .setContentText(summary)  // used where custom views aren't shown (watches, some lock screens)
+            .setContentTitle(Lang.tr(title))
+            .setContentText(Lang.tr(summary))  // used where custom views aren't shown (watches, some lock screens)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(small)
             .setCustomBigContentView(big)
@@ -274,7 +292,7 @@ object Notifier {
             .setContentIntent(openNoteIntent(ctx, note.id, 4))
             // Android 14+ lets people swipe even ongoing notifications away; we put it straight back.
             .setDeleteIntent(broadcast(ctx, PinReceiver::class.java, PinReceiver.ACTION_DISMISSED, note.id, 5))
-            .addAction(0, "Unpin", broadcast(ctx, PinReceiver::class.java, PinReceiver.ACTION_UNPIN, note.id, 6))
+            .addAction(0, Lang.tr("Unpin"), broadcast(ctx, PinReceiver::class.java, PinReceiver.ACTION_UNPIN, note.id, 6))
         try { NotificationManagerCompat.from(ctx).notify(TAG_PIN, note.id, b.build()) } catch (_: SecurityException) {}
     }
 

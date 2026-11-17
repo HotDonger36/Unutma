@@ -6,6 +6,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 enum class ThemeMode(val label: String) { DARK("Dark"), LIGHT("Light"), SYSTEM("System") }
 
+/** The language of the app's own texts. */
+enum class AppLanguage(val label: String) { ENGLISH("English"), PORTUGUESE("Português (Portugal)") }
+
 enum class SortOrder(val label: String) {
     NEWEST("Newest first"),
     OLDEST("Oldest first"),
@@ -37,7 +40,12 @@ data class Settings(
     val archiveDays: Int = 7,
     val sound: Boolean = true,
     val vibration: Boolean = true,
+    /** The reminder sound chosen from the phone's sounds (a content:// uri); empty = the phone's default notification sound. */
+    val soundUri: String = "",
+    /** Play the reminder sound on the alarm volume, so it is heard even on silent. */
+    val soundAlarm: Boolean = false,
     val widgetTextSize: TextSize = TextSize.MEDIUM,
+    val language: AppLanguage = AppLanguage.ENGLISH,
     /** Pinned notes go in the main notification list (not "Silent"), where Android shows the top one opened up. */
     val pinExpanded: Boolean = true,
 )
@@ -63,12 +71,16 @@ class Prefs private constructor(context: Context) {
         archiveDays = sp.getInt("archive_days", 7),
         sound = sp.getBoolean("notif_sound", true),
         vibration = sp.getBoolean("notif_vibration", true),
+        soundUri = sp.getString("notif_sound_uri", "") ?: "",
+        soundAlarm = sp.getBoolean("notif_sound_alarm", false),
         widgetTextSize = enumOr(sp.getString("widget_text_size", null), TextSize.MEDIUM),
+        language = enumOr(sp.getString("app_language", null), AppLanguage.ENGLISH),
         // On by default: pinned notes then sit with your main notifications, above the "Silent" group.
         pinExpanded = sp.getBoolean("pin_expanded", true),
     )
 
     fun update(change: (Settings) -> Settings) {
+        val before = _state.value.language
         val s = change(_state.value)
         sp.edit()
             .putString("theme_mode", s.themeMode.name)
@@ -78,10 +90,14 @@ class Prefs private constructor(context: Context) {
             .putInt("archive_days", s.archiveDays)
             .putBoolean("notif_sound", s.sound)
             .putBoolean("notif_vibration", s.vibration)
+            .putString("notif_sound_uri", s.soundUri)
+            .putBoolean("notif_sound_alarm", s.soundAlarm)
             .putString("widget_text_size", s.widgetTextSize.name)
+            .putString("app_language", s.language.name)
             .putBoolean("pin_expanded", s.pinExpanded)
             .apply()
         _state.value = s
+        if (s.language != before) com.example.unutma.util.Lang.set(s.language)
     }
 
     fun flag(key: String): Boolean = sp.getBoolean(key, false)
@@ -137,6 +153,7 @@ class Prefs private constructor(context: Context) {
         }
         e.commit()
         _state.value = load()
+        com.example.unutma.util.Lang.set(_state.value.language)
     }
 
     /** Plain string values (routine progress is kept as a small JSON object). null removes it. */

@@ -243,14 +243,14 @@ class CountdownWidget : NoteWidgetBase() {
             else -> Fmt.daysBetween(now, target).let { it to (if (it == 1L) "day" else "days") }
         }
         return RemoteViews(ctx.packageName, R.layout.widget_countdown).apply {
-            setTextViewText(R.id.w_cd_label, (label?.name ?: "Countdown").uppercase())
+            text(R.id.w_cd_label, (label?.name ?: "Countdown").uppercase())
             setTextColor(R.id.w_cd_label, color)
-            setTextViewText(R.id.w_cd_number, number.toString())
+            text(R.id.w_cd_number, number.toString())
             setTextColor(R.id.w_cd_number, color)
-            setTextViewText(R.id.w_cd_unit, unit)
+            text(R.id.w_cd_unit, unit)
             setTextColor(R.id.w_cd_unit, color)
-            setTextViewText(R.id.w_cd_title, noteDisplayTitle(note))
-            setTextViewText(R.id.w_cd_date, if (target == null) "" else Fmt.dateTime(target))
+            text(R.id.w_cd_title, noteDisplayTitle(note))
+            text(R.id.w_cd_date, if (target == null) "" else Fmt.dateTime(target))
             setOnClickPendingIntent(R.id.w_cd_root, Widgets.openApp(ctx, MainActivity.ACTION_OPEN_NOTE, 60_000 + widgetId, note.id))
             Widgets.scaleText(ctx, widgetId, this, R.id.w_cd_label to 11f, R.id.w_cd_number to 56f, R.id.w_cd_unit to 13f, R.id.w_cd_title to 16f, R.id.w_cd_date to 12f)
         }
@@ -273,11 +273,11 @@ class ListWidget : NoteWidgetBase() {
         val blocks = parseBlocks(note)
         val (done, total) = blocks.checkProgress() ?: (0 to 0)
         return RemoteViews(ctx.packageName, R.layout.widget_list).apply {
-            setTextViewText(R.id.w_l_label, (label?.name ?: "List").uppercase())
+            text(R.id.w_l_label, (label?.name ?: "List").uppercase())
             setTextColor(R.id.w_l_label, color)
-            setTextViewText(R.id.w_l_title, noteDisplayTitle(note, blocks))
+            text(R.id.w_l_title, noteDisplayTitle(note, blocks))
             setImageViewBitmap(R.id.w_l_ring, Widgets.ring(ctx, done, total, color, 16, 2f))
-            setTextViewText(R.id.w_l_count, "$done/$total")
+            text(R.id.w_l_count, "$done/$total")
             setInt(R.id.w_l_rule, "setBackgroundColor", color)
             setOnClickPendingIntent(R.id.w_l_header, Widgets.openApp(ctx, MainActivity.ACTION_OPEN_NOTE, 62_000 + widgetId, note.id))
             Widgets.scaleText(ctx, widgetId, this, R.id.w_l_label to 11f, R.id.w_l_title to 17f, R.id.w_l_count to 12f, R.id.w_l_locked to 12f)
@@ -375,17 +375,17 @@ class NoteWidget : NoteWidgetBase() {
             blocks.filterIsInstance<com.example.unutma.data.TextBlock>().joinToString("\n") { stripMarkdown(it.text) }.trim()
                 .ifBlank { blocks.previewLine() }
         return RemoteViews(ctx.packageName, R.layout.widget_note).apply {
-            setTextViewText(R.id.w_n_label, (label?.name ?: "Note").uppercase())
+            text(R.id.w_n_label, (label?.name ?: "Note").uppercase())
             setTextColor(R.id.w_n_label, color)
             setInt(R.id.w_n_dot, "setColorFilter", color)
             if (remind != null) {
                 setViewVisibility(R.id.w_n_remind, View.VISIBLE)
-                setTextViewText(R.id.w_n_remind_text, Fmt.reminderShort(remind))
+                text(R.id.w_n_remind_text, Fmt.reminderShort(remind))
                 setTextColor(R.id.w_n_remind_text, color)
                 setInt(R.id.w_n_bell, "setColorFilter", color)
             } else setViewVisibility(R.id.w_n_remind, View.GONE)
-            setTextViewText(R.id.w_n_title, noteDisplayTitle(note, blocks))
-            setTextViewText(R.id.w_n_body, body)
+            text(R.id.w_n_title, noteDisplayTitle(note, blocks))
+            text(R.id.w_n_body, body)
             // As many lines as fit under the label and title (about 20 dp each), so nothing spills out.
             val lines = rowsThatFit(usedDp = 92, rowDp = 20, max = 14)
             setViewVisibility(R.id.w_n_body, if (lines == 0) View.GONE else View.VISIBLE)

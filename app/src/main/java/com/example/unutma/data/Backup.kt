@@ -33,7 +33,7 @@ object Backup {
     data class Result(val notes: Int, val skipped: Int, val labels: Int, val lockedLeftOut: Int)
 
     /** Settings that belong to one phone (which note each widget shows) aren't moved. */
-    private fun movable(key: String) = !key.startsWith("widget_") || key == "widget_text_size"
+    private fun movable(key: String) = (!key.startsWith("widget_") || key == "widget_text_size") && key != "notif_sound_uri"
 
     // ─── Backing up ──────────────────────────────────────────────────────────
 

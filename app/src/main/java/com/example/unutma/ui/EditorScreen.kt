@@ -24,7 +24,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,7 +144,7 @@ fun EditorScreen(
         if (existing != null && com.example.unutma.data.Vault.isSealed(base.description)) {
             val opened = withContext(Dispatchers.IO) { com.example.unutma.data.Vault.open(base.description) }
             if (opened == null) {
-                android.widget.Toast.makeText(ctx, "Couldn't open this locked note. Unlock it and try again.", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Couldn't open this locked note. Unlock it and try again."), android.widget.Toast.LENGTH_LONG).show()
                 onBack(); return@LaunchedEffect
             }
             base = base.copy(description = opened.first); key = opened.second
@@ -231,7 +230,7 @@ private fun Editor(
     // ─── Permissions and pickers ───
     var afterNotifPermission by remember { mutableStateOf<(() -> Unit)?>(null) }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (!ok) Toast.makeText(ctx, "Notifications are off for Unutma, so reminders can't show.", Toast.LENGTH_LONG).show()
+        if (!ok) Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Notifications are off for Unutma, so reminders can't show."), Toast.LENGTH_LONG).show()
         afterNotifPermission?.invoke(); afterNotifPermission = null
     }
     fun withNotifications(block: () -> Unit) {
@@ -244,7 +243,7 @@ private fun Editor(
         if (uri != null) scope.launch {
             val path = Images.import(ctx, uri)
             if (path != null) s.insertMedia(ImageBlock(path = path))
-            else Toast.makeText(ctx, "Couldn't add that picture.", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Couldn't add that picture."), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -255,12 +254,12 @@ private fun Editor(
         if (ok) scope.launch {
             val path = Images.import(ctx, shotUri)
             if (path != null) s.insertMedia(ImageBlock(path = path))
-            else Toast.makeText(ctx, "Couldn't add that photo.", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Couldn't add that photo."), Toast.LENGTH_SHORT).show()
         }
     }
     LaunchedEffect(Unit) {
         if (startCamera) try { camera.launch(shotUri) } catch (_: Exception) {
-            Toast.makeText(ctx, "No camera app found.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(ctx, com.example.unutma.util.Lang.tr("No camera app found."), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -269,10 +268,10 @@ private fun Editor(
     var recordStart by remember { mutableLongStateOf(0L) }
     fun startRecording() {
         if (recorder.start()) { recording = true; recordStart = System.currentTimeMillis() }
-        else Toast.makeText(ctx, "Couldn't start recording.", Toast.LENGTH_SHORT).show()
+        else Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Couldn't start recording."), Toast.LENGTH_SHORT).show()
     }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (ok) startRecording() else Toast.makeText(ctx, "Unutma needs the microphone to record voice notes.", Toast.LENGTH_LONG).show()
+        if (ok) startRecording() else Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Unutma needs the microphone to record voice notes."), Toast.LENGTH_LONG).show()
     }
     DisposableEffect(Unit) { onDispose { if (recorder.isRecording) recorder.cancel() } }
 
@@ -519,9 +518,9 @@ private fun Editor(
                                 dragModifier = reorderDrag(item.id, afterLongPress = false),
                             )
                             is ImageBlock -> ImageRow(b, imageDrag(b), onResize = { w -> s.setImageWidth(b.id, w) }, onAlign = { a -> s.setImageAlign(b.id, a) }, onRemove = { s.remove(b.id) }, onExtract = {
-                                Toast.makeText(ctx, "Reading the text…", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Reading the text…"), Toast.LENGTH_SHORT).show()
                                 Ocr.extract(ctx, b.path) { text ->
-                                    if (text.isNullOrBlank()) Toast.makeText(ctx, "No text found in this picture.", Toast.LENGTH_SHORT).show()
+                                    if (text.isNullOrBlank()) Toast.makeText(ctx, com.example.unutma.util.Lang.tr("No text found in this picture."), Toast.LENGTH_SHORT).show()
                                     else s.insertTextAfter(b.id, text.trim())
                                 }
                             })
@@ -547,12 +546,12 @@ private fun Editor(
         val sug = suggestion
         Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (linkTitle != null) {
-                SuggestionChip(UI.External, buildAnnotatedString { append("Open "); withStyle(SpanStyle(color = C.fg)) { append(linkTitle) } }, tint, {
+                SuggestionChip(UI.External, buildAnnotatedString { append(com.example.unutma.util.Lang.tr("Open ")); withStyle(SpanStyle(color = C.fg)) { append(linkTitle) } }, tint, {
                     scope.launch { persist(); onOpenLink(linkTitle) }
                 })
             } else if (sug != null && s.note.reminderAt == null && sug.at !in dismissed) {
                 SuggestionChip(UI.Bell, buildAnnotatedString {
-                    append("Remind me ")
+                    append(com.example.unutma.util.Lang.tr("Remind me "))
                     withStyle(SpanStyle(color = C.fg, fontFamily = GeistMono)) { append(Fmt.dateTime(sug.at)) }
                     append("?")
                 }, tint, { withNotifications { updateNote { it.copy(reminderAt = sug.at) } } }, onDismiss = { dismissed = dismissed + sug.at })
@@ -651,7 +650,7 @@ private fun Editor(
                 val p = Prefs.get(ctx)
                 if (!p.flag("lock_warned")) {
                     p.setFlag("lock_warned", true)
-                    Toast.makeText(ctx, "Locked notes are encrypted with your phone's screen lock. If you ever remove the screen lock, Android deletes the key and locked notes can't be opened.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Locked notes are encrypted with your phone's screen lock. If you ever remove the screen lock, Android deletes the key and locked notes can't be opened."), Toast.LENGTH_LONG).show()
                 }
             } else unlock { updateNote { it.copy(isLocked = false) } }
         }
@@ -741,25 +740,25 @@ private fun MetaLine(
     }
     n.reminderAt?.let { at ->
         parts += { Seg(buildAnnotatedString { withStyle(SpanStyle(color = tint)) { append(Fmt.dateTime(at)) } }, "Reminder ${Fmt.dateTime(at)}, tap to change", onReminder) }
-        if (n.nagMinutes > 0) parts += { Seg(buildAnnotatedString { append("every ${n.nagMinutes} min") }, "Repeats every ${n.nagMinutes} minutes, tap to change", onNag) }
+        if (n.nagMinutes > 0) parts += { Seg(buildAnnotatedString { append(com.example.unutma.util.Lang.tr("every ${n.nagMinutes} min")) }, "Repeats every ${n.nagMinutes} minutes, tap to change", onNag) }
     }
     n.countdownAt?.let { at ->
         parts += {
             Seg(buildAnnotatedString {
                 append(Fmt.dateTime(at)); append(" · ")
-                withStyle(SpanStyle(color = if (Fmt.isSoon(at)) tint else C.muted)) { append(Fmt.countdown(at, long = true)) }
+                withStyle(SpanStyle(color = if (Fmt.isSoon(at)) tint else C.muted)) { append(com.example.unutma.util.Lang.tr(Fmt.countdown(at, long = true))) }
             }, "Countdown to ${Fmt.dateTime(at)}, tap to change", onCountdown)
         }
     }
     n.expiresAt?.let { at ->
-        parts += { Seg(buildAnnotatedString { withStyle(SpanStyle(color = if (Fmt.isSoon(at, 3)) tint else C.muted)) { append("expires " + Fmt.dayMonth(at)) } }, "Expires ${Fmt.dayMonth(at)}, tap to change", onExpiry) }
+        parts += { Seg(buildAnnotatedString { withStyle(SpanStyle(color = if (Fmt.isSoon(at, 3)) tint else C.muted)) { append(com.example.unutma.util.Lang.tr("expires ") + Fmt.dayMonth(at)) } }, "Expires ${Fmt.dayMonth(at)}, tap to change", onExpiry) }
     }
     val plain = buildList {
-        if (Routines.isRoutine(n)) add("repeats: " + Routines.describe(n.resetMode).lowercase())
+        if (Routines.isRoutine(n)) add(com.example.unutma.util.Lang.tr("repeats: ") + com.example.unutma.util.Lang.tr(Routines.describe(n.resetMode)).lowercase())
         if (n.isLocked) add("locked")
         add(if (s.saveStatus == "saved") (if (n.id == 0) "new" else "saved") else "…")
     }
-    plain.forEach { t -> parts += { Seg(buildAnnotatedString { append(t) }, null, null) } }
+    plain.forEach { t -> parts += { Seg(buildAnnotatedString { append(com.example.unutma.util.Lang.tr(t)) }, null, null) } }
 
     FlowRow(verticalArrangement = Arrangement.Center, itemVerticalAlignment = Alignment.CenterVertically) {
         parts.forEachIndexed { i, part ->

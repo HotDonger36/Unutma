@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -308,7 +307,7 @@ fun CalendarScreen(notes: List<Note>, onOpenNote: (Int) -> Unit, openNewEvent: B
             {
                 scope.launch {
                     val ok = withContext(Dispatchers.IO) { Cal.delete(ctx, e.eventId) }
-                    if (!ok) android.widget.Toast.makeText(ctx, "Couldn't delete that event (the calendar may be read-only).", android.widget.Toast.LENGTH_LONG).show()
+                    if (!ok) android.widget.Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Couldn't delete that event (the calendar may be read-only)."), android.widget.Toast.LENGTH_LONG).show()
                     version++; Widgets.refreshAll(ctx)
                 }
             },
@@ -403,7 +402,7 @@ fun EventSheet(notes: List<Note>, day: Long, editing: CalEvent?, onDismiss: () -
                         else editing.eventId.takeIf { Cal.update(ctx, it, editing.begin, c.id, name, start, end, allDay, reminder, repeat) }
                         if (id != null) Cal.setLinkedNote(ctx, id, noteId)
                         withContext(Dispatchers.Main) {
-                            if (id == null) android.widget.Toast.makeText(ctx, "Couldn't save the event.", android.widget.Toast.LENGTH_LONG).show()
+                            if (id == null) android.widget.Toast.makeText(ctx, com.example.unutma.util.Lang.tr("Couldn't save the event."), android.widget.Toast.LENGTH_LONG).show()
                             onSaved(); onDismiss()
                         }
                     }

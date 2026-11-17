@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -30,6 +29,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -193,28 +193,28 @@ fun NotesScreen(
     }
 
     /**
-     * Holding a note: let go without moving and it's selected (as before); drag it and it moves
-     * within its section. Dropping it switches the sort to "My order".
+     * Moving a note: while selecting, every row has a drag handle on the right. Drag it up or down
+     * to move the note within its section (pinned notes stay above the rest). Dropping it switches
+     * the sort to "My order". Holding the note itself only selects it, so the two never get mixed up.
      */
-    fun noteDrag(sectionKey: String, sectionIds: List<Int>, pinnedIds: Set<Int>, id: Int): Modifier = Modifier.pointerInput(sectionKey, id, inSelection, q) {
-        detectDragGesturesAfterLongPress(
+    fun noteDrag(sectionKey: String, sectionIds: List<Int>, pinnedIds: Set<Int>, id: Int): Modifier = Modifier.pointerInput(sectionKey, id) {
+        detectDragGestures(
             onDragStart = {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress) // "you can move it now"
                 dragMoved = 0f; dragOffset = 0f; dragId = id
-                if (!inSelection && q.isEmpty()) { dragSection = sectionKey; dragOrder = sectionIds }
+                dragSection = sectionKey; dragOrder = sectionIds
             },
             onDragEnd = {
-                val wasDrag = dragSection != null && kotlin.math.abs(dragMoved) > 12f
-                if (wasDrag) {
+                if (dragSection != null && kotlin.math.abs(dragMoved) > 12f) {
                     customOrders[sectionKey] = dragOrder
                     prefs.setNoteOrder(sectionKey, dragOrder)
                     if (sortOrder != SortOrder.CUSTOM) onSortCustom()
-                } else selection = if (id in selection) selection - id else selection + id
+                }
                 dragSection = null; dragId = null; dragOffset = 0f
             },
             onDragCancel = { dragSection = null; dragId = null; dragOffset = 0f },
         ) { change, amount ->
-            if (dragSection == null) return@detectDragGesturesAfterLongPress
+            if (dragSection == null) return@detectDragGestures
             change.consume()
             dragOffset += amount.y; dragMoved += amount.y
             val list = dragOrder.toMutableList()
@@ -343,8 +343,12 @@ fun NotesScreen(
                                         if (inSelection) selection = if (r.note.id in selection) selection - r.note.id else selection + r.note.id
                                         else onOpen(r.note)
                                     },
-                                    onSelect = { selection = selection + r.note.id },
-                                    holdModifier = noteDrag(s.key, s.rows.map { it.note.id }, s.rows.filter { it.note.isPinned }.map { it.note.id }.toSet(), r.note.id),
+                                    onSelect = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selection = selection + r.note.id
+                                    },
+                                    inSelection = inSelection,
+                                    handleModifier = if (inSelection && q.isEmpty()) noteDrag(s.key, s.rows.map { it.note.id }, s.rows.filter { it.note.isPinned }.map { it.note.id }.toSet(), r.note.id) else null,
                                 )
                             }
                         }
@@ -495,7 +499,7 @@ private fun Tab(text: String, dot: Color?, selected: Boolean, onClick: () -> Uni
 @Composable
 private fun NoteRowView(
     r: NoteRow, color: Color, ringColor: Color, selected: Boolean,
-    onClick: () -> Unit, onSelect: () -> Unit, holdModifier: Modifier = Modifier,
+    onClick: () -> Unit, onSelect: () -> Unit, inSelection: Boolean = false, handleModifier: Modifier? = null,
 ) {
     val n = r.note
     val now = System.currentTimeMillis()
@@ -503,15 +507,19 @@ private fun NoteRowView(
         Modifier
             .fillMaxWidth()
             .background(if (selected) C.selected else Color.Transparent)
-            // Holding is handled by holdModifier (select, or drag to reorder); screen readers get "Select" as an action.
-            .then(holdModifier)
-            .semantics { onLongClick(label = "Select") { onSelect(); true } }
-            .clickable(onClick = onClick)
+            // Tap opens the note (or ticks it while selecting); hold selects it.
+            .combinedClickable(onClick = onClick, onLongClick = onSelect, onLongClickLabel = "Select")
     ) {
         Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.padding(top = 8.dp)) {
-                if (selected) Box(Modifier.size(6.dp).clip(CircleShape).background(C.fg)) else Dot(color)
-            }
+            if (inSelection) {
+                // A round tick box on every note while selecting, so it's clear what is picked.
+                Box(
+                    Modifier.padding(top = 1.dp).size(22.dp).clip(CircleShape)
+                        .background(if (selected) C.accent else Color.Transparent)
+                        .border(1.5.dp, if (selected) C.accent else C.faint, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { if (selected) Icon(UI.Tick, "Selected", tint = C.bg, modifier = Modifier.size(14.dp)) }
+            } else Box(Modifier.padding(top = 8.dp)) { Dot(color) }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(r.title, style = Ty.rowTitle, color = C.fg, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
@@ -545,6 +553,12 @@ private fun NoteRowView(
                     ProgressRing(p.first, p.second, ringColor)
                     Text("${p.first}/${p.second}", style = Ty.mono, color = C.muted)
                 }
+            }
+            if (handleModifier != null) {
+                Box(
+                    Modifier.then(handleModifier).size(width = 36.dp, height = 36.dp).semantics { contentDescription = "Drag to move" },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(UI.Drag, null, tint = C.muted, modifier = Modifier.size(20.dp)) }
             }
         }
         HDivider()
